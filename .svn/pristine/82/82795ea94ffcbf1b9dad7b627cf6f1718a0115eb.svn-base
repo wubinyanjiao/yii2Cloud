@@ -1,0 +1,971 @@
+<?php
+/**
+ * Yii2 Shortcuts
+ * @author Eugene Terentev <eugene@terentev.net>
+ * -----
+ * This file is just an example and a place where you can add your own shortcuts,
+ * it doesn't pretend to be a full list of available possibilities
+ * -----
+ */
+
+/**
+ * @return int|string
+ */
+function getMyId()
+{
+    return Yii::$app->user->getId();
+}
+
+/**
+ * @param string $view
+ * @param array $params
+ * @return string
+ */
+function render($view, $params = [])
+{
+    return Yii::$app->controller->render($view, $params);
+}
+
+/**
+ * @param $url
+ * @param int $statusCode
+ * @return \yii\web\Response
+ */
+function redirect($url, $statusCode = 302)
+{
+    return Yii::$app->controller->redirect($url, $statusCode);
+}
+
+/**
+ * @param string $key
+ * @param mixed $default
+ * @return mixed
+ */
+function env($key, $default = null)
+{
+
+    $value = getenv($key) ?? $_ENV[$key] ?? $_SERVER[$key];
+
+    if ($value === false) {
+        return $default;
+    }
+
+    switch (strtolower($value)) {
+        case 'true':
+        case '(true)':
+            return true;
+
+        case 'false':
+        case '(false)':
+            return false;
+    }
+
+    return $value;
+}
+
+function settoken()
+    {
+        $str = md5(uniqid(md5(microtime(true)),true));
+        $str = sha1($str);  //加密
+        return $str;
+    }
+
+/**
+ * @author 吴斌  2018/7/19 修改 
+ * 根据日期获取对应的星期
+ * @param date $date 日期年月日
+ * @return string | 星期
+ */
+function  get_week($date){
+
+    $date_str=date('Y-m-d',strtotime($date));
+    $arr=explode("-", $date_str);
+    $year=$arr[0];
+    $month=sprintf('%02d',$arr[1]);
+    $day=sprintf('%02d',$arr[2]);
+    $hour = $minute = $second = 0;   
+    $strap = mktime($hour,$minute,$second,$month,$day,$year);
+    $number_wk=date("w",$strap);
+    $weekArr=array('1'=> '周一', '2'=> '周二', '3'=>'周三','4'=>'周四', '5'=> '周五', '6'=>'周六','0'=>'周日');
+    return $number_wk;
+}
+/**
+ * @author 吴斌  2018/7/19 修改 
+ * 获取两个日期之间的所有日期
+ * @param date $start 起始日期 
+ * @param date $end 结束日期
+ * @return array | 日期
+ */
+function prDates($start,$end){
+    $dt_start = strtotime($start);
+    $dt_end = strtotime($end);
+    while ($dt_start<=$dt_end){
+        $data[]= date('Y-m-d',$dt_start);
+        $dt_start = strtotime('+1 day',$dt_start);
+    }
+    return $data;
+}
+
+
+/**
+ * @author 吴斌  2018/7/19 修改 
+ * 对象转数组
+ * @param obj $array 对象 
+ * @return array | 数组
+ */
+
+function object_array($array) {  
+    if(is_object($array)) {  
+        $array = (array)$array;  
+    } 
+    if(is_array($array)) {  
+        foreach($array as $key=>$value) {  
+            $array[$key] = object_array($value);  
+        }  
+    }  
+    return $array;  
+} 
+/**
+ * @author 吴斌  2018/1/11 修改 
+ * 将‘年－月－日’拆分为数组
+ *
+ * @param date $birthday   日期
+ * @return array $arr  处理后的结果
+ */
+function getFormatDate($date){
+        $temp=explode(':', $date);
+        $copy_day=$temp[0];
+        $arr['y']=date('Y',strtotime($copy_day));
+        $arr['m']=date('n',strtotime($copy_day));
+        $arr['d']=date('j',strtotime($copy_day));
+        $arr['hm']=date('H:m',strtotime($copy_day));
+        return $arr;
+}
+/**
+* @author 吴斌
+* @var date1日期1
+* @var date2 日期2
+* @var tags 年月日之间的分隔符标记,默认为'-' 
+* @return 相差的月份数量
+* @example:
+    $date1 = "2003-08-11";
+    $date2 = "2008-11-06";
+    $monthNum = getMonthNum( $date1 , $date2 );
+    echo $monthNum;
+*/
+function getMonthNum( $date1, $date2, $tags='-' ){
+    $date1_stamp=strtotime($date1);
+    $date2_stamp=strtotime($date2);
+    list($date_1['y'],$date_1['m'])=explode("-",date('Y-m',$date1_stamp));
+    list($date_2['y'],$date_2['m'])=explode("-",date('Y-m',$date2_stamp));
+    return abs(($date_2['y']-$date_1['y'])*12 +$date_2['m']-$date_1['m']);
+}
+
+/**
+ * @author 吴斌  2018/1/11 修改 
+ * 计算两个日期之间的年数
+ *
+ * @param date $birthday   出生日期
+ * @return string $year_diff   年 
+ */
+function birthday($birthday){
+  list($year,$month,$day) = explode("-",$birthday);
+  $year_diff = date("Y") - $year;
+  $month_diff = date("m") - $month;
+  $day_diff  = date("d") - $day;
+  if ($day_diff < 0 || $month_diff < 0)
+   $year_diff--;
+  return $year_diff;
+}
+
+
+/**
+ * @author 吴斌
+ * 将数组转换成XML字符串
+ *
+ * 本方法的反向方法为 `xml_to_array($xml_string)`
+ *
+ *     // 返回格式化好的XML字符串
+ *     array_to_xml($arr);
+ *
+ *     // XML缩进使用4个空格
+ *     array_to_xml($arr, '    ');
+ *
+ *     // 返回不带任何换行符、空格的XML
+ *     array_to_xml($arr, '', '');
+ *
+ * @param array $array 数组
+ * @param string $tab 缩进字符，默认 tab 符
+ * @param string $crlf 换行符，默认window换行符
+ * @param string $attribute_key XML的attributes所在key，默认 `@attributes`
+ * @param string $xml_header_string XML第一行声明的字符串
+ * @return string
+ */
+ function array_to_xml(array $array, $tab = "\t", $crlf = "\r\n", $attribute_key = '@attributes', $xml_header_string = null)
+{
+
+    if (!$xml_header_string)
+    {
+        $w = '?';
+        $xml_header_string = '<'. $w . 'xml version="1.0" encoding="UTF-8"'. $w .'>';
+    }
+
+    $format_attribute_value = function (& $value)
+    {
+        if (true===$value)
+        {
+            $value = 'true';
+        }
+        elseif (false===$value)
+        {
+            $value = 'false';
+        }
+        elseif (null===$value)
+        {
+            $value = 'null';
+        }
+    };
+
+    $format_to_xml_string = function($array, $attribute_key, $crlf, $tab, $left_str = '') use(&$format_to_xml_string, $format_attribute_value)
+    {
+        $str = '';
+
+        if (isset($array['@name']))
+        {
+            $str .= "{$crlf}{$left_str}<{$array['@name']}";
+
+            if (isset($array[$attribute_key]))
+            {
+                foreach($array[$attribute_key] as $k=>$v)
+                {
+                    $format_attribute_value($v);
+                    $str .= " $k=\"{$v}\"";
+                }
+            }
+
+            $str .= ">";
+
+            $close_str = "{$crlf}{$left_str}</{$array['@name']}>";
+
+            $left_str .= $tab;
+        }
+        else
+        {
+            $close_str = '';
+        }
+
+        if (isset($array['@tdata']))
+        {
+            $str .= "<![CDATA[{$array['@tdata']}]]></{$array['@name']}>";
+        }
+        else
+        {
+            $have_str = false;
+            foreach($array as $key => $value)
+            {
+             
+                if ($key === '@name' || $key === $attribute_key || $key === '@data' || $key === '@tdata')continue;
+
+                $have_str = true;
+
+                if (is_array($value))
+                {
+                    if (!is_numeric($key))
+                    {
+                        $str .= "{$crlf}{$left_str}<{$key}";
+
+                        if (isset($value[$attribute_key]))
+                        {
+                            foreach($value[$attribute_key] as $k=>$v)
+                            {
+                                $str .= " $k=\"{$v}\"";
+                            }
+                        }
+
+                        if (isset($value['@data']))
+                        {
+                            if(empty($value['@data'])){
+                                $str .= "/>";
+
+                            }else{
+                                $format_attribute_value($value['@data']);
+                                $str .= ">";
+                                $str .= "{$value['@data']}";
+                                $str .= "</{$key}>";
+                            }
+                            
+
+                        }
+
+                        elseif (isset($value['@tdata']))
+                        {
+                            $str .= ">";
+                            $str .= "<![CDATA[{$value['@tdata']}]]>";
+                            $str .= "</{$key}>";
+                        }
+                        else
+                        {
+                            $str .= ">";
+                            $tmp_str = $format_to_xml_string($value, $attribute_key, $crlf, $tab, $left_str . $tab);
+                            if (''!==$tmp_str)
+                            {
+                                $str .= $tmp_str."{$crlf}{$left_str}";
+                                $str .= "</{$key}>";
+                            }
+                            unset($tmp_str);
+                        }
+
+                        
+                    }
+                    else
+                    {
+                        $str .= $format_to_xml_string($value, $attribute_key, $crlf, $tab, $left_str);
+                    }
+                }
+                else
+                {
+                    $format_attribute_value($value);
+                    $str .= "{$crlf}{$left_str}<{$key}>{$value}</{$key}>";
+                }
+            }
+
+            if ($have_str)
+            {
+                if ($close_str)
+                {
+                    $str .= $close_str;
+                }
+            }
+            else
+            {
+                $str .= "</{$array['@name']}>";
+            }
+        }
+        return $str;
+    };
+
+
+    return $xml_header_string . $format_to_xml_string($array, $attribute_key, $crlf, $tab, '');
+}
+
+
+/**
+ * @author 吴斌  2018/1/11 修改 
+ * 将数据保存为文件
+ *
+ * @param date $key   文件名
+ * @param date $value 文件内容
+ * @param date $path   文件路径
+ * @return string 将存储的文件不以json方式读区
+ */
+function cacheData($key,$value='',$path=''){
+
+    $dir=dirname(dirname(__DIR__)).'/optaplannerxml/';
+    $filename=$dir.$path.$key.'.xml';
+    if($value!==''){//写入缓存
+        //首先判断目录是否存在，如果不存在，创建目录
+        $dir=dirname($filename);
+        if(!is_dir($dir)){
+            mkdir($dir,0777);
+        }
+        //写入文件
+         file_put_contents($filename, $value);
+    }
+    //读取缓存文件
+    if(!is_file($filename)){
+        return false;
+    }else{
+        return true;
+    }
+  
+}
+/**
+ * @author 吴斌  2018/1/11 修改 
+ * 允许java文件
+ *
+ * @param date $key   文件名
+ * @param date $value 文件内容
+ * @param date $path   文件路径
+ * @return string 将存储的文件不以json方式读区
+ */
+  function runJava($scheduleID,$copytype=null,$domain){
+
+        $base_path=dirname(dirname(__DIR__)).'/optaplannerxml/';
+        $last=substr($scheduleID, -1);
+        $xml_path=$base_path.'xml_'.$last;
+        if(!is_dir($xml_path)){
+            mkdir($xml_path,0777);
+        }
+
+        $file_path=$xml_path."/roster_".$scheduleID.'.xml';
+
+        $resutlt_path=$xml_path."/roster_".$scheduleID."_solved.xml";
+
+        if($copytype=="one"){
+            $timespent=60;
+        }else if($copytype=="two"){
+            $timespent=60;
+        }else{
+            $timespent=60;
+        }
+        $content = array(
+            'domain2'=>$domain,
+            'script'=>'NurseRoster.jar',
+            'scripttime'=>$timespent,//秒
+            'xml'=>$file_path,//相对路径
+            'resultxml'=>$resutlt_path,//生成结果
+            'dt'=>time(),
+            'successtriggersql'=>"update ohrm_work_schedule set status=? where id=$scheduleID",
+            'successtriggerapisql'=>"update ohrm_work_schedule set is_insert =? where id=$scheduleID",
+            'scheduleid'=>$scheduleID
+
+        );
+        $content = json_encode($content,JSON_UNESCAPED_UNICODE);
+        $memcache_obj = memcache_connect(env('MQ_HOST'), 22201);
+        $result = memcache_set($memcache_obj, 'hrm_paiban', $content, 0, 0);
+        return $result;
+       
+    }
+
+/**
+ * @author 潘  2018/7/26
+ * 根据当前日期获取默认查询日期
+ * @return [type] [description]
+ */
+function getDefaultDate(){
+    $w = date('w');
+    switch ($w){
+        case 0:
+          $statDate = date('Y-m-d',strtotime('-6 days'));
+          $endDate = date('Y-m-d');
+          break;  
+        case 1:
+          $statDate = date('Y-m-d');
+          $endDate = date('Y-m-d',strtotime('+6 days'));
+          break;
+        case 2:
+          $statDate = date('Y-m-d',strtotime('-1 days'));
+          $endDate = date('Y-m-d',strtotime('+5 days'));
+          break;
+        case 3:
+          $statDate = date('Y-m-d',strtotime('-2 days'));
+          $endDate = date('Y-m-d',strtotime('+4 days'));
+          break;
+        case 4:
+          $statDate = date('Y-m-d',strtotime('-3 days'));
+          $endDate = date('Y-m-d',strtotime('+3 days'));
+          break;
+        case 5:
+          $statDate = date('Y-m-d',strtotime('-4 days'));
+          $endDate = date('Y-m-d',strtotime('+2 days'));
+          break;
+        case 6:
+          $statDate = date('Y-m-d',strtotime('-5 days'));
+          $endDate = date('Y-m-d',strtotime('+1 days'));
+          break;
+        default:
+        $statDate = date('Y-m-d');
+        $endDate = date('Y-m-d');
+    }
+
+
+    return array('statDate'=>$statDate,'endDate'=>$endDate);
+}
+/**
+ * @author 吴斌  2018/1/11 修改 
+ * xml转数组
+ * @param date $xml   xml
+ * @return array 返回数组
+ */
+function xmlToArray($xml){ 
+        libxml_disable_entity_loader(true);   
+        $xmlstring = simplexml_load_string($xml, 'SimpleXMLElement', LIBXML_NOCDATA); 
+        $val = json_decode(json_encode($xmlstring),true); 
+        return $val; 
+    }
+
+/**
+ * 微信通知进队列
+ * @param  [type] $customer_id [description]
+ * @param  [type] $openid      [description]
+ * @param  [type] $templateId  [description]
+ * @param  [type] $first  [description]
+ * @param  [type] $keyword1    [description]
+ * @param  [type] $keyword2    [description]
+ * @param  [type] $keyword3    [description]
+ * @param  [type] $remark      [description]
+ * @param  [type] $color       [description]
+ * @return [type]              [description]
+ */
+function weiXinNotice($customer_id,$openid,$templateId,$first,$keyword1,$keyword2,$keyword3,$remark,$url = null){
+
+        // $params = Yii::$app->params;
+        // $templateId = $params['XAJDYFYXBTEMPLATEID'];
+        // var_dump($templateId);die;
+    $color = array('first'=>'#000','keyword1'=>'#000','keyword2'=>'#000','keyword3'=>'#000','remark'=>'#000');
+    $message = [
+        'customer_id'=>$customer_id,
+        'touser'=>$openid,
+        'template_id'=>$templateId,
+        'data'=>[
+            'first'=>['value'=>$first,'color'=>$color['first']],
+            'keyword1'=>['value'=>$keyword1,'color'=>$color['keyword1']],
+            'keyword2'=>['value'=>$keyword2,'color'=>$color['keyword2']],
+            'keyword3'=>['value'=>$keyword3,'color'=>$color['keyword3']],
+            
+            'remark'=>['value'=>"\n".$remark,'color'=>$color['remark']]
+        ],
+        'url'=>$url
+    ];
+    $content = json_encode($message,JSON_UNESCAPED_UNICODE);
+    $memcache_obj = memcache_connect(env('MQ_HOST'), 22201);
+    $result = memcache_set($memcache_obj, 'hrm_weixintemplate', $content, 0, 0);
+    if(!$result){
+        $result = memcache_set($memcache_obj, 'hrm_weixintemplate', $content, 0, 0);
+    }
+    return $result;
+}
+
+function httpPostByYii($param = array(),$url = null,$ispttps = true){
+
+     $ch = curl_init();
+     //如果$param是数组的话直接用
+     curl_setopt($ch, CURLOPT_URL, $url);
+     //如果$param是json格式的数据，则打开下面这个注释
+     // curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+     //         'Content-Type: application/json',
+     //         'Content-Length: ' . strlen($param))
+     // );
+     curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
+     curl_setopt($ch, CURLOPT_POST, 1);
+     curl_setopt($ch, CURLOPT_POSTFIELDS, $param);
+     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+     if($ispttps){
+        //如果用的协议是https则打开鞋面这个注释
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, FALSE);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, FALSE);
+     }
+    $data = curl_exec($ch);
+    curl_close($ch);
+    return $data;
+    
+}
+
+/**
+ * 二维数组根据字段进行排序
+ * @params array $array 需要排序的数组
+ * @params string $field 排序的字段
+ * @params string $sort 排序顺序标志 SORT_DESC 降序；SORT_ASC 升序
+ */
+ function arraySequence($array, $field, $sort = 'SORT_DESC')
+{
+    $arrSort = array();
+    foreach ($array as $uniqid => $row) {
+        foreach ($row as $key => $value) {
+            $arrSort[$key][$uniqid] = $value;
+        }
+    }
+    array_multisort($arrSort[$field], constant($sort), $array);
+    return $array;
+}
+
+
+function getFileDown($url, $save_dir = '', $filename = '', $type = 0) {
+    if (trim($url) == '') {
+        return false;
+    }
+    $s = $url;
+    if (trim($save_dir) == '') {
+        $save_dir = './';
+    }
+    if (0 !== strrpos($save_dir, '/')) {
+        $save_dir.= '/';
+    }
+    //创建保存目录
+    if (!file_exists($save_dir) && !mkdir($save_dir, 0777, true)) {
+        return false;
+    }
+    //获取远程文件所采用的方法
+    if ($type) {
+        $ch = curl_init();
+        $timeout = 5;
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
+        $content = curl_exec($ch);
+        curl_close($ch);
+    } else {
+        ob_start();
+        readfile($url);
+        $content = ob_get_contents();
+        ob_end_clean();
+    }
+    $size = strlen($content);
+    if($size<=0){
+        return false;
+    }
+
+    //文件大小
+    $fp2 = @fopen($save_dir . $filename, 'a');
+    fwrite($fp2, $content);
+    fclose($fp2);
+    unset($content, $url);
+    return array(
+        'file_name' => $filename,
+        'save_path' => $save_dir . $filename,
+        'status'=>true,
+        'size'=>$size,
+        'img'=>$s
+    );
+}
+/**
+* 根据开始时间 结束时间计算除周末外的可请假天
+* 排除周六周日和节假日
+* @param $start       开始日期
+* @param $offset      经过天数
+* @param $end         结束日期
+* @param $exception 例外的节假日
+* @return
+*  examples:输入(2010-06-25,5,''),得到2010-07-02
+*/
+function getendday1( $start='now',$end='',$exception='' ){
+    /*
+        $exception = array(
+            '2010-01-01','2010-01-02','2010-01-03',
+            '2010-04-03','2010-04-04','2010-04-05',
+            '2010-05-01','2010-05-02','2010-05-03',
+            '2010-06-14','2010-06-15','2010-06-16',
+            '2010-09-22','2010-09-23','2010-09-24',
+            '2010-10-01','2010-10-02','2010-10-03','2010-10-04',
+            '2010-10-05','2010-10-06','2010-10-07',
+            
+        );
+     */
+    $starttime = strtotime($start);
+    $endtime = 0;
+    if($end){
+        $endtime = strtotime("+0 days",strtotime($end));
+        if($endtime<$starttime){
+            return false;
+        }
+        $offset = ($endtime-$starttime)/(24*3600) ;
+
+    }else{
+        if(empty($offset)){
+            $offset = 0;
+        }
+
+        $endtime = strtotime("+$offset days",$starttime);
+    }
+
+    $tmptime = $starttime ;
+    $weekEnd = array(0,6);
+    $inDay = array();
+    $endDay = null;
+    $i = 0;
+
+   // var_dump($offset);var_dump($tmptime,$endtime);die;
+    while( $offset >= 0 && $tmptime <= $endtime){
+        $weekday = date('w', $tmptime);
+       
+        $tmpday = date('y-m-d', $tmptime);
+
+        
+        
+       // var_dump($tmpday);
+        $bfd = false;//是否节假日
+        if(is_array($exception)){
+            $bfd = in_array($tmpday,$exception);
+        }else{
+            $bfd = ($exception==$tmpday);
+        }
+        if( !in_array($weekday,$weekEnd) && !$bfd){//不是周末和节假日
+            $offset--;
+            #echo "tmpday={$tmpday}"."<br />";
+            array_push($inDay, $tmpday);
+
+            $endDay = $tmpday;
+
+        }
+        
+        
+        $tmptime += 24*3600;
+    }
+    
+    return array('endDay'=>$endDay,'useDay'=>$inDay);
+}
+/**
+*  根据开始时间 天数计算除周末外的可请假天
+*/
+function getendday2( $start='now', $offset=0, $exception='' ){
+    /*
+        $exception = array(
+            '2010-01-01','2010-01-02','2010-01-03',
+            '2010-04-03','2010-04-04','2010-04-05',
+            '2010-05-01','2010-05-02','2010-05-03',
+            '2010-06-14','2010-06-15','2010-06-16',
+            '2010-09-22','2010-09-23','2010-09-24',
+            '2010-10-01','2010-10-02','2010-10-03','2010-10-04',
+            '2010-10-05','2010-10-06','2010-10-07',
+            
+        );
+     */
+
+    $starttime = strtotime($start);
+    $tmptime = $starttime ;
+    $weekEnd = array(0,6);
+    $inDay = array();
+    $endDay = null;
+    while( $offset > 0 ){
+        $weekday = date('w', $tmptime);
+        $tmpday = date('y-m-d', $tmptime);
+        $bfd = false;//是否节假日
+        if(is_array($exception)){
+            $bfd = in_array($tmpday,$exception);
+        }else{
+            $bfd = ($exception==$tmpday);
+        }
+        if(!in_array($weekday,$weekEnd)&& !$bfd){//不是周末和节假日
+            $offset--;
+            array_push($inDay, $tmpday);
+            $endDay = $tmpday;
+        }
+        $tmptime += 24*3600;
+    }
+    
+     return array('endDay'=>$endDay,'useDay'=>$inDay);;
+}
+
+// 二维数组去重  
+ function array_unset_tt($arr,$key){     
+    //建立一个目标数组  
+    $res = array();  
+    if(empty($arr)){
+        return $res;
+    }
+
+    foreach ($arr as $value) {           
+       //查看有没有重复项  
+         
+       if(isset($res[$value[$key]])){  
+             //有：销毁  
+              
+             unset($value[$key]);  
+               
+       }  
+       else{  
+              
+            $res[$value[$key]] = $value;  
+       }    
+    }  
+    return $res;  
+} 
+function getTimeConversionNew($time,$date){
+    if($time<=60){
+        if($time<1){
+            $time=1;
+        }
+        return $time.'分钟之前';
+    }else if($time <= 1440&&$time>60){
+        return floor($time/60).'小时之前';
+    }else if($time>1440){
+        return date('m-d',strtotime($date));
+    }
+}
+
+function uplaode_excel_files($file ,$address,$formview =null)
+    {
+        $path = '../public';
+
+        $path = Yii::$app->basePath ; //C:\phpStudy\PHPTutorial\WWW\dev.xajdyfyyxb.api.ebangong365.com\frontend
+
+
+        $time = (string) time();
+        $rand = rand(1,10000);
+
+        $path_url = "../public/".$address; // 接收文件目录
+        
+        if (!is_dir( $path_url )) {  
+                 
+            mkdir ( "$path_url", 0777, true );              
+        }
+        $size = 1024*1024*30;  //判断上传的文件30M
+        
+        if(is_array($file)){
+            if(empty($formview)){
+                if($file['size']>$size){
+                    return false;
+                }
+            }else{
+                if($file[$formview]['size']>$size){
+                    return false;
+                }
+            }
+            $jpg = explode('.', $file[$formview]['name']);
+            $end = end($jpg);
+            $new_name = '/public/'.$address.'/'.$time.$rand.'.'.$end;
+            $a= move_uploaded_file($file[$formview]['tmp_name'],$path.$new_name);
+        }else if(is_object($file)){
+            if(empty($formview)){
+                if($file->getSize()>$size){
+                    return false;
+                }
+            }else{
+                if($file[$formview]['size']>$size){
+                    return false;
+                }
+            }
+            $jpg = explode('.', $file->getOriginalName());
+            $new_name = '/public/'.$address.'/'.$time.$rand.'.'.$jpg[1];
+            $a= move_uploaded_file($file->getTempName(),$path.$new_name);
+        }
+
+        if($a){
+            //return '/symfony/web'.$new_name;
+            return '..'.$new_name;
+        }else{
+            return false;
+        }
+
+        
+    }
+
+function uplaode_files_by_excel($file,$is_del = 0)
+    {
+        $new_file = $file;
+        //$new_file ='public/excel/15135139009099.xlsx';
+        require_once '../../common/phpexcel/PHPExcel.php';
+        $PHPExcel=new \PHPExcel();
+        
+
+        $houzi = substr(strrchr($new_file, '.'), 1);
+
+        $pathinfo = pathinfo($new_file);
+
+        if($houzi == 'xls'){
+            require_once '../../common/phpexcel/PHPExcel/Reader/Excel5.php';
+            $PHPReader=new \PHPExcel_Reader_Excel5();
+        }else if($houzi == 'xlsx'){
+            require_once '../../common/phpexcel/PHPExcel/Reader/Excel2007.php';
+            $PHPReader=new \PHPExcel_Reader_Excel2007();
+        }else{
+            return false;
+        }
+        // require_once sfConfig::get('sf_symfony_lib_dir'). '/util/PHPExcel/Reader/Excel2007.php';
+        //  $PHPReader=new \PHPExcel_Reader_Excel2007();
+        
+        $PHPExcel=$PHPReader->load($new_file);
+        $currentSheet=$PHPExcel->getSheet(0); 
+
+        //获取总列数
+
+        $allColumn=$currentSheet->getHighestColumn();
+
+        //获取总行数
+
+        $allRow=$currentSheet->getHighestRow();
+        $data = array();
+        for($currentRow=1;$currentRow<=$allRow;$currentRow++){        //循环读取每个单元格的内容。注意行从1开始，列从A开始
+                for($currentColumn=65;$currentColumn<=ord($allColumn);$currentColumn++){
+                        if($currentColumn>90){
+                             $a1='A'.chr($currentColumn-26);
+                        }else{
+                            $a1= chr($currentColumn);
+                        }
+
+                        $addr = $a1.$currentRow;
+                      
+                        $cell = $currentSheet->getCell($addr)->getValue();
+                        if($cell instanceof PHPExcel_RichText){ //富文本转换字符串
+                                $cell = $cell->__toString();
+                        }
+                        if(!trim($cell)){
+                            $cell = 0;
+                        }
+                        $data[$currentRow][$a1] = trim($cell);
+
+                        unset($cell);
+                }             
+
+        }
+
+        ini_restore('post_max_size');
+        if($is_del){
+            unlink($new_file);    //删除上传的文件
+        }
+
+        return $data;
+
+        
+    }
+function arrayToXml($arr,$dom=0,$item=0){ 
+    if (!$dom){ 
+        $dom = new DOMDocument("1.0"); 
+    } 
+    if(!$item){ 
+        $item = $dom->createElement("root"); 
+        $dom->appendChild($item); 
+    } 
+    foreach ($arr as $key=>$val){ 
+        $itemx = $dom->createElement(is_string($key)?$key:"item"); 
+        $item->appendChild($itemx); 
+        if (!is_array($val)){ 
+            $text = $dom->createTextNode($val); 
+            $itemx->appendChild($text); 
+
+        }else { 
+            arrayToXml($val,$dom,$itemx); 
+        } 
+    } 
+    return $dom->saveXML(); 
+} 
+
+/**
+ * 把生成的xml 生成文件存服务端
+ * 
+ */
+function GenerateXMLToFile($arr,$path){
+    $value =  arrayToXml($arr);
+    //$file_path=sfConfig::get('sf_web_dir');
+
+    $_dir = "../public/".$path;
+
+    //$_dir=$file_path.'/public'.$path;
+    $filename=$_dir.'.xml';
+ 
+
+    if($value!==''){//写入缓存
+        //首先判断目录是否存在，如果不存在，创建目录
+        $dir=dirname($filename);
+        if(!is_dir($dir)){
+            mkdir($dir,0777);
+        }
+        //写入文件
+         file_put_contents($filename, $value,true);
+    }
+    return '/public'.$path;
+}
+
+//计算累加 $n前个自然数的累加和 
+function getSumbyN($n){
+    if($n>1){
+        $s=getSumbyN($n-1)+$n;
+    }else{
+        $s=1;
+    }
+    return $s;
+}
+//转换科学计数法
+function NumToStr($num){
+    if (stripos($num,'e')===false) return $num;
+    $num = trim(preg_replace('/[=\'"]/','',$num,1),'"');
+    $result = 0;
+    while ($num > 0){
+        $v = $num - floor($num / 10)*10;
+        $num = floor($num / 10);
+        $result   =   $v . $result;
+    }
+    return $result;
+}
+    

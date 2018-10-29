@@ -1,0 +1,874 @@
+<?php
+namespace frontend\controllers\v1;
+
+use Yii;
+use yii\web\Response;
+use yii\helpers\Url;
+use yii\web\Controller;
+use common\models\shift\ShiftType;
+use common\models\shift\TypeSkill;
+
+class ShiftTypeController extends \common\rest\Controller
+{
+    /**
+     *  
+     * @var string
+     */
+    public $modelClass = 'common\models\ShiftType';
+
+    /**
+     * 
+     * @var array
+     */
+    public $serializer = [
+        'class' => 'common\rest\Serializer',    // 返回格式数据化字段
+        'collectionEnvelope' => 'result',       // 制定数据字段名称
+        'message' => 'OK',                      // 文本提示
+        'errno'   => 0,
+        'status'  =>''
+    ];
+    /**
+     * @param  [action] yii\rest\IndexAction
+     * @return [type] 
+     */
+    public function beforeAction($action)
+    {
+        $format = \Yii::$app->getRequest()->getQueryParam('format', 'json');
+
+        if($format == 'xml'){
+            \Yii::$app->response->format = \yii\web\Response::FORMAT_XML;
+        }else{
+            \Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+        }
+
+        return $action;
+    }
+
+    /**
+     * @param  [type]
+     * @param  [type]
+     * @return [type]
+     */
+    public function afterAction($action, $result){
+        $result = parent::afterAction($action, $result);
+
+        return $result;
+    }
+
+    public function behaviors()
+    {
+        $behaviors = parent::behaviors();
+        $behaviors['contentNegotiator']['formats']['text/html'] = Response::FORMAT_HTML;
+        return $behaviors;
+    }
+
+    public function actions()
+    {
+        $actions = parent::actions();
+        unset($actions['index']);
+        return $actions;
+    }
+
+    /**
+     * @SWG\Post(path="/shift-type/create",
+     *     tags={"云平台-ShiftType-班次类型"},
+     *     summary="班次类型",
+     *     description="新建班次类型",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "name",
+     *        description = "班次名称",
+     *        required = true,
+     *        type = "string"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "start_time",
+     *        description = "开始时间,例如：03:12",
+     *        required = true,
+     *        type = "string",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "end_time",
+     *        description = "结束时间",
+     *        required = true,
+     *        type = "string",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "start_time_afternoon",
+     *        description = "开始时间,例如：03:12",
+     *        required = true,
+     *        type = "string",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "end_time_afternoon",
+     *        description = "结束时间",
+     *        required = true,
+     *        type = "string",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "require_employee",
+     *        description = "所需人数",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "status",
+     *        description = "状态，1是开启，0时关闭",
+     *        required = false,
+     *        type = "integer",
+     *        default = 1,
+     *        enum = {0,1}
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "is_grant",
+     *        description = "是否有补助金，1是开启，0时关闭",
+     *        required = false,
+     *        type = "integer",
+     *        default = 1,
+     *        enum = {0,1}
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "is_night_shift",
+     *        description = "是否是夜班",
+     *        required = false,
+     *        type = "integer",
+     *        default = 1,
+     *        enum = {0,1}
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "is_amont_work",
+     *        description = "'是否添加工作量 1添加 0不添加",
+     *        required = false,
+     *        type = "integer",
+     *        default = 1,
+     *        enum = {0,1}
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "is_daka_half",
+     *        description = "是否 中途打卡  1是  0否",
+     *        required = false,
+     *        type = "integer",
+     *        default = 0,
+     *        enum = {0,1}
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "clock_in",
+     *        description = "是否可以早退，0可以，1不可以",
+     *        required = false,
+     *        type = "integer",
+     *        default = 0,
+     *        enum = {0,1}
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "is_work_half",
+     *        description = "是否是只上上午半天班，0不是，1是",
+     *        required = false,
+     *        type = "integer",
+     *        default = 0,
+     *        enum = {0,1}
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "duty_factor",
+     *        description = "工作系数",
+     *        required = false,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "week_select",
+     *        description = "定义周几上班，格式[1，2]",
+     *        required = false,
+     *        type = "string",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "skill_id",
+     *        description = "所需资质，格式[1，2]",
+     *        required = false,
+     *        type = "string",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "remark",
+     *        description = "班次备注",
+     *        required = false,
+     *        type = "string"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "color",
+     *        description = "班次背景色",
+     *        required = false,
+     *        type = "string"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "is_approval",
+     *        description = "班次是否需要审批，0不需要，1需要审批",
+     *        required = false,
+     *        type = "integer",
+     *        default = 1,
+     *        enum = {0,1}
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "is_work_overtime",
+     *        description = "是否是加班类型的班次1是，0不是",
+     *        required = false,
+     *        type = "integer",
+     *        default = 1,
+     *        enum = {0,1}
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回班次类型列表"
+     *     ),
+     * )
+     *
+    **/
+    public function actionCreate()
+    {
+        $isLeader=$this->isLeader;
+        if(!$isLeader){
+            $this->serializer['errno']   = '422';
+            $this->serializer['status']   = false;
+            $this->serializer['message'] = '权限不够，只有组长及副组长权限可以';
+            return [];
+        }
+
+        $transaction = Yii::$app->db->beginTransaction();
+        try {
+            if (Yii::$app->request->isPost) {
+
+                $post = Yii::$app->request->post();
+
+                $name= $post['name'];
+                $start_time= $post['start_time'];
+                $end_time= $post['end_time'];
+                $is_grant= $post['is_grant'];
+                $is_night_shift= $post['is_night_shift'];
+                $is_amont_work= $post['is_amont_work'];
+                $require_employee= $post['require_employee'];
+                $week_select= $post['week_select'];
+                $start_time_afternoon= $post['start_time_afternoon'];
+                $end_time_afternoon= $post['end_time_afternoon'];
+                $is_work_overtime= $post['is_work_overtime'];
+                $is_work_half= $post['is_work_half'];
+                $clock_in= $post['clock_in'];
+                $is_daka_half= $post['is_daka_half'];
+                $remark= $post['remark'];
+                $is_approval=$post['is_approval'];
+                $duty_factor=$post['duty_factor'];
+                $skill_list_string=$post['skill_id'];
+                $location_id=$this->workStation;
+                $status=$post['status'];
+                $color=$post['color'];
+                $skill_list=json_decode($skill_list_string);
+                $create_at=date('Y-m-d',time());
+
+                $typemodel=new ShiftType;
+                $typemodel->name=$name;
+                $typemodel->start_time=$start_time;
+                $typemodel->end_time=$end_time;
+                $typemodel->is_grant=$is_grant;
+                $typemodel->is_night_shift=$is_night_shift;
+                $typemodel->is_amont_work=$is_amont_work;
+                $typemodel->require_employee=$require_employee;
+                $typemodel->week_select=$week_select;
+                $typemodel->start_time_afternoon=$start_time_afternoon;
+                $typemodel->end_time_afternoon=$end_time_afternoon;
+                $typemodel->is_work_overtime=$is_work_overtime;
+                $typemodel->is_work_half=$is_work_half;
+                $typemodel->clock_in=$clock_in;
+                $typemodel->is_daka_half=$is_daka_half;
+                $typemodel->remark=$remark;
+                $typemodel->location_id=$location_id;
+                $typemodel->create_at=$create_at;
+                $typemodel->duty_factor=$duty_factor;
+                $typemodel->skill_id=$skill_list_string;
+                $typemodel->status=$status;
+                $typemodel->color=$color;
+                if (!$typemodel->save()) {
+                    throw new \Exception();
+                }
+                $type_id = $typemodel->getPrimaryKey();
+                $work_station=(int)$typemodel->location_id;
+
+                foreach ($skill_list as $skill) {
+                    $typeskillmodel=new TypeSkill;
+                    $typeSkill['shift_type_id'] = $type_id;
+                    $typeSkill['skill_id'] = (int)$skill;
+                    $typeSkill['work_station'] = $work_station;
+                    $data['TypeSkill'] = $typeSkill;
+
+                    if (!$typeskillmodel->add($data)) {
+                       throw new \Exception();
+                    }
+                }
+            }
+            $transaction->commit();
+            $data = ShiftType::find()->where('id = :id', [':id' => $type_id])->one();
+            $data['week_select']=json_decode($data['week_select']);
+            $data['skill_id']=json_decode($data['skill_id']);
+
+            $this->serializer['errno']   = 0;
+            $this->serializer['status']   = true;
+            $this->serializer['message'] = "创建成功";
+            return $data;
+
+
+        }catch(\Exception $e) {
+            $transaction->rollback();
+            $this->serializer['errno']   = 200006000;
+            $this->serializer['status']   = false;
+            $this->serializer['message'] = $typemodel->getErrors();
+        }
+    }
+
+    /**
+     * @SWG\Post(path="/shift-type/updates",
+     *     tags={"云平台-ShiftType-班次类型"},
+     *     summary="修改班次类型",
+     *     description="修改班次类型",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "id",
+     *        description = "班次类型Id",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "name",
+     *        description = "班次名称",
+     *        required = false,
+     *        type = "string"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = false,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "start_time",
+     *        description = "开始时间,例如：03:12",
+     *        required = false,
+     *        type = "string",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "end_time",
+     *        description = "结束时间",
+     *        required = false,
+     *        type = "string",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "start_time_afternoon",
+     *        description = "开始时间,例如：03:12",
+     *        required = false,
+     *        type = "string",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "end_time_afternoon",
+     *        description = "结束时间",
+     *        required = false,
+     *        type = "string",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "require_employee",
+     *        description = "所需人数",
+     *        required = false,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "status",
+     *        description = "状态，1是开启，0时关闭",
+     *        required = false,
+     *        type = "integer",
+     *        default = 1,
+     *        enum = {0,1}
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "is_grant",
+     *        description = "是否有补助金，1是开启，0时关闭",
+     *        required = false,
+     *        type = "integer",
+     *        default = 1,
+     *        enum = {0,1}
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "is_night_shift",
+     *        description = "是否是夜班",
+     *        required = false,
+     *        type = "integer",
+     *        default = 1,
+     *        enum = {0,1}
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "is_amont_work",
+     *        description = "'是否添加工作量 1添加 0不添加",
+     *        required = false,
+     *        type = "integer",
+     *        default = 1,
+     *        enum = {0,1}
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "duty_factor",
+     *        description = "工作系数",
+     *        required = false,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "week_select",
+     *        description = "定义周几上班，格式[1，2]",
+     *        required = false,
+     *        type = "string",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "skill_id",
+     *        description = "所需资质，格式[1，2]",
+     *        required = false,
+     *        type = "string",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "remark",
+     *        description = "班次备注",
+     *        required = false,
+     *        type = "string"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "is_approval",
+     *        description = "班次是否需要审批，0不需要，1需要审批",
+     *        required = false,
+     *        type = "integer",
+     *        default = 1,
+     *        enum = {0,1}
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "color",
+     *        description = "班次背景色",
+     *        required = false,
+     *        type = "string"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "is_work_half",
+     *        description = "是否是只上上午半天班，0不是，1是",
+     *        required = false,
+     *        type = "integer",
+     *        default = 0,
+     *        enum = {0,1}
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "clock_in",
+     *        description = "是否可以早退，0可以，1不可以",
+     *        required = false,
+     *        type = "integer",
+     *        default = 0,
+     *        enum = {0,1}
+     *     ),
+
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "is_work_overtime",
+     *        description = "是否是加班类型的班次1是，0不是",
+     *        required = false,
+     *        type = "integer",
+     *        default = 0,
+     *        enum = {0,1}
+     *     ),
+     
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "is_daka_half",
+     *        description = "是否 中途打卡  1是  0否",
+     *        required = false,
+     *        type = "integer",
+     *        default = 0,
+     *        enum = {0,1}
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回班次类型列表"
+     *     ),
+     * )
+     *
+    **/
+    public function actionUpdates()
+    {
+        $isLeader=$this->isLeader;
+        if(!$isLeader){
+            $this->serializer['errno']   = '422';
+            $this->serializer['status']   = false;
+            $this->serializer['message'] = '权限不够，只有组长及副组长权限可以';
+            return [];
+        }
+        $post=Yii::$app->request->post();
+        $type_id=$post['id'];
+        $work_station=$this->workStation;
+        $skill_list=json_decode($post['skill_id']); 
+        $shiftType=new ShiftType;
+
+        if($shiftType->updateType($post)){
+
+            $skills=TypeSkill::find()->where('shift_type_id = :type', [':type' => $type_id])->asArray()->all();
+
+            $idList=array();
+            $skillList=array();
+        
+            //如果第一个有的第二个没有，则删除
+            foreach ($skills as $key => $skill) {
+                $skillid=$skill['skill_id'];
+                if(!in_array($skillid, $skill_list)){
+                    $del_model=TypeSkill::find()->where('id=:id',[':id'=>$skill['id']])->one();
+                    $del_model->delete();
+                }else{
+                    $idList[$key] = $skillid;
+                }
+            }
+            
+            if(count($idList)>count($skill_list)){
+                $skillList = array_diff($idList,$skill_list); 
+            }else{
+                $skillList = array_diff($skill_list,$idList); 
+            }
+
+
+            foreach ($skillList as $key => $skill) {
+
+                $typeskillmodel=new TypeSkill;
+                $typeSkill['shift_type_id'] = $type_id;
+                $typeSkill['skill_id'] = $skill;
+                $typeSkill['work_station'] = $work_station;
+                $dataskill['TypeSkill'] = $typeSkill;
+                if(!$typeskillmodel->add($dataskill)){
+                    $this->serializer['errno']   = 20006000;
+                    $this->serializer['status']   = false;
+                    $this->serializer['message'] = "创建失败";
+                    return [];
+
+                }
+            }
+
+            $data = ShiftType::find()->where('id = :id', [':id' => $type_id])->one();
+            $data['week_select']=json_decode($data['week_select']);
+            $data['skill_id']=json_decode($data['skill_id']);
+
+            $this->serializer['errno']   = 0;
+            $this->serializer['status']   = true;
+            $this->serializer['message'] = "更新成功";
+            return $data;
+              
+        }else{
+            $data = ShiftType::find()->where('id = :id', [':id' => $type_id])->one();
+            $data['week_select']=json_decode($data['week_select']);
+            $data['skill_id']=json_decode($data['skill_id']);
+
+            $this->serializer['errno']   = 2000060000;
+            $this->serializer['status']   = false;
+            $this->serializer['message'] = "未更新";
+        }
+    }
+
+    /**
+     * @SWG\Post(path="/shift-type/shift-type-page",
+     *     tags={"云平台-ShiftType-班次类型"},
+     *     summary="查询班次-分页",
+     *     description="查询班次-分页",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "所属小组；23:测试组id；11门诊组ID；12中药房id，13门诊药房id",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "page",
+     *        description = "第几页",
+     *        required = false,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回班次类型列表"
+     *     ),
+     * )
+     *
+    **/
+    public function actionShiftTypePage()
+    {
+
+        $post=Yii::$app->request->post();
+        
+        $shiftType=new ShiftType;
+        $location_id=$this->workStation;
+
+
+        $page=isset($post['page'])?$post['page']:'0';
+        $pageSize = Yii::$app->params['pageSize']['shift'];
+
+        $shiftTypeList=$shiftType->getShifTypeByPage($location_id,$page,$pageSize);
+
+        $shift_types=array();
+        $skill_new=array();
+        foreach ($shiftTypeList['data'] as $key => $value) {
+            $value['week_select']=json_decode($value['week_select']);
+            $skill_list=json_decode($value['skill_id']);
+            if(is_array($skill_list )){
+                foreach ($skill_list as $ks => $vs) {
+                    $skill_new[$ks]=(string)$vs;
+                }
+            }else{
+                $skill_new=array();
+            }
+            
+            $value['skill_id']= $skill_new;
+            
+            $shift_types[$key]=$value;
+            
+        }
+
+        $shift_type_new['totalCount']=(int)$shiftTypeList['totalCount'];
+        $shift_type_new['pageSize']=(int)$pageSize;
+        $shift_type_new['current_page']=(int)$page;
+
+        $shift_type_new['data']=$shift_types;
+
+
+
+        $this->serializer['errno']   = 0;
+        $this->serializer['status']   = true;
+        $this->serializer['message'] = "获取成功";
+        return $shift_type_new;  
+       
+    }
+
+    /**
+     * @SWG\Post(path="/shift-type/shift-type-list",
+     *     tags={"云平台-ShiftType-班次类型"},
+     *     summary="查询班次",
+     *     description="查询班次",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "所属小组；23:测试组id；11门诊组ID；12中药房id，13门诊药房id",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回班次类型列表"
+     *     ),
+     * )
+     *
+    **/
+    public function actionShiftTypeList()
+    {
+
+        $post=Yii::$app->request->post();
+        
+        $shiftType=new ShiftType;
+        $location_id=$this->workStation;;
+
+        $shiftTypeList=$shiftType->getShifType($location_id);
+        if(count($shiftTypeList)>0){
+            foreach ($shiftTypeList as $key => $value) {
+                $value['week_select']=json_decode($value['week_select']);
+                $skill_list=json_decode($value['skill_id']);
+                if(is_array($skill_list )){
+                    foreach ($skill_list as $ks => $vs) {
+                        $skill_new[$ks]=(string)$vs;
+                    }
+                }else{
+                    $skill_new=array();
+                }
+                
+                $value['skill_id']= $skill_new;
+                
+                $shift_types[$key]=$value;
+                
+            }
+
+
+            $this->serializer['errno']   = 0;
+            $this->serializer['status']   = true;
+            $this->serializer['message'] = "获取成功";
+            return $shift_types;  
+        }else{
+
+            $this->serializer['errno']   = 2000060000;
+            $this->serializer['status']   = false;
+            $this->serializer['message'] = "获取失败";
+        }
+    }
+
+
+    /**
+     * @SWG\Post(path="/shift-type/get",
+     *     tags={"云平台-ShiftType-班次类型"},
+     *     summary="查询班次",
+     *     description="查询班次",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "type_id",
+     *        description = "班次类型ID",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回班次类型列表"
+     *     ),
+     * )
+     *
+    **/
+    public function actionGet()
+    {
+
+        $post=Yii::$app->request->post();
+        
+        $shiftType=new ShiftType;
+        $type_id=(int)$post['type_id'];
+
+        $skillarr=array();
+
+        $shiftTypeList=$shiftType->getShifTypeById($type_id);
+        $shiftTypeList['week_select']=json_decode($shiftTypeList['week_select']);
+        $shiftTypeList['skill_id']=!empty($shiftTypeList['skill_id'])?json_decode($shiftTypeList['skill_id']):$skillarr;
+
+        if($shiftTypeList['skill_id']==0){
+            $shiftTypeList['skill_id']=$skillarr;
+        }
+
+        if($shiftTypeList['color']==null){
+            $shiftTypeList['color']= '';
+        }
+
+        $shiftTypeList['require_employee']=(int)$shiftTypeList['require_employee'];
+        $shiftTypeList['duty_factor']=(int)$shiftTypeList['duty_factor'];
+        if(count($shiftTypeList)>0){
+
+            $this->serializer['errno']   = 0;
+            $this->serializer['status']   = true;
+            $this->serializer['message'] = "获取成功";
+            return $shiftTypeList;  
+
+           
+        }else{
+            $this->serializer['errno']   = 2000060000;
+            $this->serializer['status']   = false;
+            $this->serializer['message'] = "获取失败";
+        }
+    }
+
+
+    /**
+     * @SWG\Post(path="/shift-type/delete",
+     *     tags={"云平台-ShiftType-班次类型"},
+     *     summary="删除班次",
+     *     description="删除班次",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "type_id",
+     *        description = "班次类型ID,格式[1,2,3]",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回班次类型列表"
+     *     ),
+     * )
+     *
+    **/
+    public function actionDelete()
+    {
+        $isLeader=$this->isLeader;
+        if(!$isLeader){
+            $this->serializer['errno']   = '422';
+            $this->serializer['status']   = false;
+            $this->serializer['message'] = '权限不够，只有组长及副组长权限可以';
+            return [];
+        }
+        $post=Yii::$app->request->post();
+        
+        $shiftType=new ShiftType;
+        $type_id=json_decode($post['type_id']);
+
+        
+        try{
+            foreach ($type_id as $key => $typeid) {
+                $query=$shiftType::deleteAll(['id'=>$typeid]);
+            }
+            $this->serializer['errno']   = 0;
+            $this->serializer['status']   = true;
+            $this->serializer['message'] = "删除成功"; 
+
+        }catch(\Exception $e) {
+            $this->serializer['errno']   = 200006000;
+            $this->serializer['status']   = false;
+            $this->serializer['message'] = "删除失败"; 
+        }
+    }
+
+}
+
+?>

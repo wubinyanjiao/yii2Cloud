@@ -1,0 +1,194 @@
+<?php
+
+namespace common\models\shift;
+
+use Yii;
+use \common\models\shift\base\Schedule as BaseSchedule;
+use yii\helpers\ArrayHelper;
+use common\models\shift\ShiftOrderBy;
+use common\models\shift\ShiftResult;
+use common\models\shift\ShiftResultOrange;
+use common\models\shift\ShiftResultConfirm;
+use common\models\employee\employee;
+
+/**
+ * This is the model class for table "ohrm_work_schedule".
+ */
+class Schedule extends BaseSchedule
+{
+
+    public function behaviors()
+    {
+        return ArrayHelper::merge(
+            parent::behaviors(),
+            [
+                # custom behaviors
+            ]
+        );
+    }
+
+    public function rules()
+    {
+        return ArrayHelper::merge(
+            parent::rules(),
+            [
+                # custom validation rules
+            ]
+        );
+    }
+
+    public function addSchedule($data)
+    {
+        
+        $data['Schedule']['create_at']=date('Y-m-d',time());
+
+        if($data['Schedule']['copy_type']==1){
+            $data['Schedule']['copy_type']='one';
+        }else if($data['Schedule']['copy_type']==2){
+            $data['Schedule']['copy_type']='two';
+        }
+        if ($this->load($data) && $this->save()) {
+            return true;
+        }
+        return false;
+    }
+
+    public function getSchedule($work_station){
+        $scheduleList = self::find()->select('id,name')->where(' is_confirm > 0 and is_show >0 and location_id = :work_station', [':work_station' => $work_station])->orderBy('id desc')->all();
+        return $scheduleList;
+    }
+
+
+    public function getScheduleListArr($work_station){
+        $scheduleList = self::find()->select('id,name')->where(' is_confirm > 0 and is_show >0 and location_id = :work_station', [':work_station' => $work_station])->orderBy('id desc')->asArray()->all();
+        return $scheduleList;
+    }
+
+
+    /**
+     * @author 吴斌  2018/7/19 修改 
+     * 获取计划
+     * @param array $work_station 所属小组 
+     * @param array $start_date 开始日期
+     * @param array $end_date 结束日期 
+     * @param array $page 页码
+     * @param array $pageSize 每页显示个数
+     * @return array | 日期
+     */
+
+
+    public function getScheduleList($work_station,$page,$pageSize,$start_date,$end_date,$name,$is_leader=false){
+        $query = self::find()->where(' is_show > 0 and location_id = :work_station', [':work_station' => $work_station]);
+
+        if(!$is_leader){//如果不是组长
+            $query ->andWhere(['is_confirm > 0']);
+        }
+     
+
+        if (isset($start_date)&&!empty($start_date)) {
+           $query ->andWhere(['>','shift_date',$start_date]);
+        }
+        if (isset($end_date)&&!empty($end_date)) {
+           $query ->andWhere(['<','shift_date',$end_date]);
+        }
+
+        if (isset($name)&&!empty($name)) {
+           $query ->andWhere(['like', 'name', $name]);
+        }
+        $count=$query->count();
+        $data['totalCount']=(int)$count;
+        $data['pageSize']=(int)$pageSize;
+        $data['current_page']=(int)$page;
+        $startrow = ($page-1)*$pageSize;
+        $data['data']=$query->offset($startrow)->limit($pageSize)->orderBy('id DESC')->asArray()->all();
+        return $data;
+    }
+
+
+    /**
+     * @author 吴斌  2018/4/3 修改 
+     * 循环排班结果
+     * @param int $id 计划ID
+     * @param int $emps 员工编号员工组
+     * @param int $shift_dates 日期组
+     * @param int $result_type 排班表结果类型
+     * @return array $date_format   规范化数组 
+     */
+    public function rollShiftResult($schedule_id,$emps,$shift_dates,$result_type){
+
+        $confirmmodel=new ShiftResultConfirm;
+        $shiftordermodel=new ShiftOrderBy;
+        $employeemodel=new Employee;
+        $roll_sort=0;
+
+        
+        $assignment_list=$confirmmodel->getShiftResultByContions($schedule_id,$emps,$shift_dates);
+        $emp_news=$shiftordermodel->getShiftOrderBy($schedule_id);
+
+        $emp_new=array_column($emp_news, 'emp_number');
+        if(count($emp_new)>0){
+            $employ_list=$emp_new;
+        }else{
+            $employeeList=$employeemodel->group($work_station);
+            $employ_list=array_column($employeeList,'emp_number');
+        }
+        $employ_list=array_unique($employ_list);
+        $employ_list_assignment=array_column($assignment_list,'emp_number');
+        $employ_list_assignment=array_unique($employ_list_assignment);
+    
+        //参与循环的顺序替换
+        $employee_array=array();
+        foreach ($emps as $key => $employee) {
+            if(in_array($employee, $employ_list_assignment)){
+                foreach ($assignment_list as $k => $assignment) {
+                    if($assignment['emp_number']==$employee){
+                        $employee_array[$employee][]=$assignment;
+                    }
+                }
+            }else{
+                $employee_array[$employee][]='';
+            }
+
+            if(in_array($employee, $emp_new)){
+                 foreach ($emp_news as $k => $orderIndex) {
+                    if($orderIndex['emp_number']==$employee){
+                        $orderByEmp[$employee][]=$orderIndex;
+                    }
+                 }
+            }
+        }
+
+
+        $arr_keys=array_keys($employee_array);
+        $order_keys=array_keys($orderByEmp); 
+
+        //循环排序
+        if($roll_sort==0){
+            array_unshift($arr_keys, array_pop($arr_keys));
+            array_unshift($order_keys, array_pop($order_keys));
+        }else{
+            array_push($arr_keys, array_shift($arr_keys));
+            array_push($order_keys, array_shift($order_keys));
+        }
+
+        $array_ab=array_combine($arr_keys,$employee_array);
+        $order_ab=array_combine($order_keys,$orderByEmp);
+
+        //存储交换的排班结果
+        if(count($array_ab)>0){
+            foreach ($array_ab as $key => $new_result) {
+                foreach ($new_result as $k => $v) {
+                    if(null!=$v){
+                        $shiftconfirmodel=new ShiftResultConfirm;
+                        if(!$shiftconfirmodel->updateResultEmp($v['id'],$key)){
+                            throw new \Exception();
+                        }
+                    }
+                }
+            }
+        }
+
+
+    }
+    
+}

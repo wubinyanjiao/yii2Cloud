@@ -1,0 +1,199 @@
+<?php
+
+namespace common\models\attendance;
+
+use Yii;
+use \common\models\attendance\base\ApproverTab as BaseApproverTab;
+use yii\helpers\ArrayHelper;
+use \common\models\employee\Employee;
+use \common\models\shift\ShiftChangeApply;
+/**
+ * This is the model class for table "ohrm_approver_tab".
+ */
+class ApproverTab extends BaseApproverTab
+{
+
+    public function behaviors()
+    {
+        return ArrayHelper::merge(
+            parent::behaviors(),
+            [
+                # custom behaviors
+            ]
+        );
+    }
+
+    public function rules()
+    {
+        return ArrayHelper::merge(
+            parent::rules(),
+            [
+                # custom validation rules
+            ]
+        );
+    }
+
+    /**
+     * 根据申请人ID 获取 审核人
+     * 
+     */
+    public function getApplicantBySubEmployee($sub,$id,$type,$queryType=false){
+        $list = self::getApplicantBySubEmployeeByType($sub,$id,$type,$queryType);
+
+        if($queryType!==false){
+
+            return $list;
+        }else{
+   
+            if($list){
+                $sup = '';
+                $wit = '';
+                $gre = '';
+                $Employee = new Employee();
+                foreach($list as $key=>$val){
+                    if($key==0){
+                        if($val['witness_id']){
+                            $emps = explode(',', $val['witness_id']);
+                            $witness = $Employee->getEmpByNumNber($emps);
+                            if($witness){
+                                foreach ($witness as $k => $v) {
+                                    $wit .= $v['emp_firstname'].','; 
+                                }
+                            }
+                        }
+                    }
+                    $chaoName = $val['chao_name'];
+                    $sup .=$val['supervisor']['emp_firstname'].',';
+                    if(!empty($val['agreeordinate']['emp_firstname'])){
+                        $gre = $val['agreeordinate']['emp_firstname'] ;
+                    }
+                }
+            }else{
+                return false;
+            }
+
+            
+            $chao = trim($chaoName,',');
+            $sup = trim($sup,',');
+            $wit = trim($wit,',');
+
+            return array('sup'=>$sup,'wit'=>$wit,'gre'=>$gre,'chao'=>$chao);
+        }
+        
+    }
+
+    public function getApplicantBySubEmployeeByType($sub,$id,$type,$queryType=null){
+
+         if(empty($type)){
+              return false;
+         }
+
+         $q = ApproverTab::find();
+
+                $q->joinWith("supervisor as s");
+                $q->joinWith("subordinate as r");
+                $q->joinWith("agreeordinate as t");
+                $q->orderBy('ohrm_approver_tab.id DESC');
+              if(!empty($sub)){
+
+                
+                if(is_array($sub)){
+                    $q->andWhere(['in','ohrm_approver_tab.sub_employee',$sub]);
+                  
+                }else{
+                   $q->andWhere('ohrm_approver_tab.sub_employee = :sub',[':sub'=>$sub]);
+                }
+              }
+              if($queryType){
+                   $q->andWhere('ohrm_approver_tab.status = :queryType',[':queryType'=>$queryType]);
+              }else{
+                  if($queryType===0){
+                     $q->andWhere('ohrm_approver_tab.status = :status',[':status'=>$queryType]);
+                  }
+              }
+
+            //  $q->where('a.sub_employee = ?',$sub);
+              if($type ==1){
+                 $q->andWhere('ohrm_approver_tab.leave_id = :id',[':id'=>$id]);
+              }else if($type ==2){
+                 $q->andWhere('ohrm_approver_tab.overtime_id = :id',[':id'=>$id]);
+              }else if($type ==3){
+                 $q->andWhere('ohrm_approver_tab.attend_id = :id',[':id'=>$id]);
+              }else if($type==4){
+                 if($id){
+                    $q->andWhere('ohrm_approver_tab.shift_apply_id = :id',[':id'=>$id]);
+                 }else{
+                    $q->andWhere('ohrm_approver_tab.app_type = :type',[':type'=>$type]);
+                 }
+                 
+              }
+              
+
+        $result = $q->all();      
+        //var_dump($result);die;
+        // $result = $q->execute();
+        return $result;
+      
+    }
+
+    public function getWorkShiftChangeApplyById($id){
+         if(empty($id)){
+              return false;
+         }
+
+         $q = ShiftChangeApply::find();
+
+        $q->where('id = :id',[':id'=>$id]);
+        $result = $q->one();      
+        // $result = $q->execute();
+        return $result;
+      
+    }
+
+    public function getApplicantById($sub,$id,$type){
+
+         if(empty($type)){
+              return false;
+         }
+
+         $q = ApproverTab::find();
+
+              if(!empty($sub)){
+
+                
+                if(is_array($sub)){
+                    $q->andWhere(['in','sub_employee',$sub]);
+                  
+                }else{
+                   $q->andWhere('sub_employee = :sub',[':sub'=>$sub]);
+                }
+              }
+              
+            //  $q->where('a.sub_employee = ?',$sub);
+              if($type ==1){
+                 $q->andWhere('leave_id = :id',[':id'=>$id]);
+              }else if($type ==2){
+                 $q->andWhere('overtime_id = :id',[':id'=>$id]);
+              }else if($type ==3){
+                 $q->andWhere('attend_id = :id',[':id'=>$id]);
+              }else if($type==4){
+                 if($id){
+                    $q->andWhere('shift_apply_id = :id',[':id'=>$id]);
+                 }else{
+                    $q->andWhere('app_type = :type',[':type'=>$type]);
+                 }
+                 
+              }
+              
+
+        $result = $q->all();      
+        //var_dump($result);die;
+        // $result = $q->execute();
+        return $result;
+      
+    }
+
+
+
+
+}

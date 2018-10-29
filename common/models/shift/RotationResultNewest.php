@@ -1,0 +1,43 @@
+<?php
+
+namespace common\models\shift;
+
+use Yii;
+use \common\models\shift\base\RotationResultNewest as BaseRotationResultNewest;
+use yii\helpers\ArrayHelper;
+
+/**
+ * This is the model class for table "ohrm_rotationResultNewest".
+ */
+class RotationResultNewest extends BaseRotationResultNewest
+{
+
+    public function behaviors()
+    {
+        return ArrayHelper::merge(
+            parent::behaviors(),
+            [
+                # custom behaviors
+            ]
+        );
+    }
+
+    public function rules()
+    {
+        return ArrayHelper::merge(
+            parent::rules(),
+            [
+                # custom validation rules
+            ]
+        );
+    }
+    public function getNewestOne($rotationId,$rotationDate,$groupId)
+    {
+        $data = self::find()
+            ->where(['rotationId'=>$rotationId])
+            ->andWhere(['rotationDate'=>$rotationDate])
+            ->andWhere(['groupId'=>$groupId])
+            ->one();
+        return $data;
+    }
+}

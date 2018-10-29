@@ -1,0 +1,50 @@
+﻿<?php
+
+return [
+    'adminEmail' => 'admin@example.com',
+    'pageSize' => [
+        'manage' => 10,
+        'user'   => 10,
+        'product' => 10,
+        'shift' => 10,
+        'order' => 10,
+        'default'=>20
+
+    ],
+    'defaultValue' => [
+        'avatar' => 'assets/admin/img/contact-img.png',
+    ],
+    'defaultHead'=>env('STORAGE_HOST_INFO').'web/user_default.jpg',
+    'express' => [
+        1 => '中通快递',
+        2 => '顺丰快递',
+    ],
+    'expressPrice' => [
+        1 => 15,
+        2 => 20,
+    ],
+    'templateId'=>['xajdyfyyxb'=>['default'=>'qpnHCR1Ks24JZ8_zhRIcqnpRzxnOUyoG6ZglJHEsF58'],
+                   'heliteq'=>['default'=>'-pGxtxw8rv7OLXxnFBkMOaOOCxeOm2PljXVRYAriFVs'],
+    
+    ],
+    'work_time_late'=>10,
+    'kehuImage'=>[
+                    'default'=>[
+                            'index'=>env('STORAGE_HOST_INFO').'web/logo_heliteq_index.jpg',
+                            'logo'=>env('STORAGE_HOST_INFO').'web/logo_heliteq.png',
+                            'small'=>env('STORAGE_HOST_INFO').'web/logo_heliteq_small.png',    
+                           ],
+                    'xajdyfyyxb'=>[
+                            'index'=>env('STORAGE_HOST_INFO').'web/logo_xajdyfyyxb_index.jpg',
+                            'logo'=>env('STORAGE_HOST_INFO').'web/logo_xajdyfyyxb.png',
+                            'small'=>env('STORAGE_HOST_INFO').'web/logo_xajdyfyyxb_small.png',
+                           ],
+                    'heliteq'=>[
+                            'index'=>env('STORAGE_HOST_INFO').'web/logo_heliteq_index.jpg',
+                            'logo'=>env('STORAGE_HOST_INFO').'web/logo_heliteq.png',
+                            'small'=>env('STORAGE_HOST_INFO').'web/logo_heliteq_small.png', 
+                        ]
+
+
+    ]
+];

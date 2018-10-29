@@ -1,0 +1,45 @@
+<?php
+
+namespace common\models\subunit;
+
+use Yii;
+use \common\models\subunit\base\Subunit as BaseSubunit;
+use yii\helpers\ArrayHelper;
+use \common\models\employee\Employee;
+
+/**
+ * This is the model class for table "ohrm_subunit".
+ */
+class Subunit extends BaseSubunit
+{
+
+    public function behaviors()
+    {
+        return ArrayHelper::merge(
+            parent::behaviors(),
+            [
+                # custom behaviors
+            ]
+        );
+    }
+
+    public function rules()
+    {
+        return ArrayHelper::merge(
+            parent::rules(),
+            [
+                # custom validation rules
+            ]
+        );
+    }
+
+    public function getAllWorkStation($customerId){
+        $query = Subunit::find();
+        if($customerId){
+            $query->where('customer_id = :customerId',[':customerId' => $customerId]);
+        }
+        
+        $list  = $query->all();
+        return $list;
+    }
+}

@@ -1,0 +1,80 @@
+<?php
+
+namespace common\models\overtime;
+
+use common\models\subunit\Subunit;
+use common\models\employee\Employee;
+use common\models\user\User;
+use Yii;
+use \common\models\overtime\base\ShiftResult as BaseShiftResult;
+use yii\helpers\ArrayHelper;
+
+/**
+ * This is the model class for table "ohrm_work_shift_result".
+ */
+class ShiftResult extends BaseShiftResult
+{
+
+    public function behaviors()
+    {
+        return ArrayHelper::merge(
+            parent::behaviors(),
+            [
+                # custom behaviors
+            ]
+        );
+    }
+
+    public function rules()
+    {
+        return ArrayHelper::merge(
+            parent::rules(),
+            [
+                # custom validation rules
+            ]
+        );
+    }
+
+    public function scheduling($time,$customer_id){
+        if($time != ''){
+            $time=strtotime($time);
+            $time=date('Y-m-d',$time);
+        }else{
+            $time = date('Y-m-d',time());
+        }
+
+        $sub_where = " id != 1 and customer_id = '$customer_id'";
+        $subunit = Subunit::find()->select(['id','name'])->where($sub_where)->all();
+        foreach ($subunit as $kk => $vv){
+            $sub = Subunit::find()->where(['unit_id'=>$vv['id'],'customer_id'=>$customer_id])->one();
+            if($sub == ''){
+                $data_sub[] = $vv;
+            }
+        }
+        //return $data_sub;
+
+        foreach ($data_sub as $k => $v){
+            $where1 = "work_station = '$v[id]' and termination_id is NULL";
+            $arr = Employee::find()->asArray()->select(['emp_number'])->where($where1);
+            $user = $arr->all();
+            $num = $arr->count();
+
+            foreach ($user as $key=>$val){
+                $user_arr[] = $val['emp_number'];
+            }
+            $user_str = join(',', $user_arr);
+            $where = "emp_number in ($user_str) and shift_date = '$time' and shift_type_id > 0";
+            $shangban = ShiftResult::find()->asArray()->where($where)->count();
+            $other = $num-$shangban;
+
+            $info[$k]['id'] = $v['id'];
+            $info[$k]['subunit_name'] = $v['name'];
+            $info[$k]['work'] = $shangban;
+            $info[$k]['other'] = $other;
+        }
+        return $info;
+
+
+    }
+
+}

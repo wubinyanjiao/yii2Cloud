@@ -1,0 +1,99 @@
+<?php
+
+namespace common\models\shift;
+
+use Yii;
+use \common\models\shift\base\RotationEmployee as BaseRotationEmployee;
+use yii\base\UserException;
+use yii\db\Query;
+use yii\helpers\ArrayHelper;
+
+/**
+ * This is the model class for table "ohrm_rotationemployee".
+ */
+class RotationEmployee extends BaseRotationEmployee
+{
+
+    public function behaviors()
+    {
+        return ArrayHelper::merge(
+            parent::behaviors(),
+            [
+                # custom behaviors
+            ]
+        );
+    }
+
+    public function rules()
+    {
+        return ArrayHelper::merge(
+            parent::rules(),
+            [
+                # custom validation rules
+            ]
+        );
+    }
+
+    public function getRotationEmployeeAll($groupId)
+    {
+//        var_dump($groupId);exit;
+        $data = self::find()->where(['work_station'=>$groupId/*,'emp_number'=>656*/])->asArray()->all();
+        return $data;
+    }
+
+    /**
+     * @param $groupId
+     * @param $rotationDate
+     * 获取每个组的全部符合条件的人串
+     */
+    public function getStatusAll($groupId/*,$rotationDate*/)
+    {
+        $data = self::find()
+            ->where(['work_station'=>$groupId])
+            ->andWhere([/*'rotationDate'=>$rotationDate,*/'!=','isDel',2])
+            ->asArray()
+            ->all();
+        return $data;
+    }
+    public function createEmployee($userAll)
+    {
+        //从基础人员里筛选初步参加轮转的人存储到 轮转人员信息临时表(rotationEmployee)
+        if(is_array($userAll)){
+            foreach ($userAll as $key=>$value){
+                foreach ($value as $k=>$v){
+                    $RotationEmployee = new RotationEmployee;
+                    //先暂时这样判断取值,后续要加上时间字段rotationDate
+                    $RotationEmployeelist = $RotationEmployee->getRotationEmployeeAll($groupId);
+                    if($v['is_rotation'] == null){
+                        if(!$RotationEmployeelist){
+                            $RotationEmployee->rotationDate = $v['rotationDate'];
+                            $RotationEmployee->work_station = $v['work_station'];
+                            $RotationEmployee->emp_firstname = $v['emp_firstname'];
+                            $RotationEmployee->emp_number = $v['emp_number'];
+                            $RotationEmployee->work_time = $v['work_time'];
+                            $RotationEmployee->count_work_time = $v['count_work_time'];
+                            $RotationEmployee->is_leader = $v['is_leader'];
+                            $RotationEmployee->title_id = $v['title_id'];
+                            $RotationEmployee->emp_gender = $v['emp_gender'];
+                            $RotationEmployee->record_id = $v['record_id'];
+                            $RotationEmployee->emp_birthday = $v['emp_birthday'];
+                            $RotationEmployee->is_rotation = $v['is_rotation'];
+                            $RotationEmployee->mutual_exclusion = $v['mutual_exclusion'];
+                            if(!$RotationEmployee->save()){
+                                var_dump($RotationEmployee->getErrors());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    public function getrotationEmployeeOne($firstgroupid,$firstemp)
+    {
+        $data = self::find()
+            ->where(['work_station'=>$firstgroupid,'emp_number'=>$firstemp])
+            ->asArray()
+            ->one();
+        return $data;
+    }
+}

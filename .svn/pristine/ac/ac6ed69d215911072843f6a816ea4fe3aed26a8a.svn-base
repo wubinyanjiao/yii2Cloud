@@ -1,0 +1,68 @@
+<?php
+
+namespace common\models\leave;
+
+use Yii;
+use \common\models\leave\base\LeaveEntitlementLog as BaseLeaveEntitlementLog;
+use yii\helpers\ArrayHelper;
+
+/**
+ * This is the model class for table "ohrm_leave_entitlement_log".
+ */
+class LeaveEntitlementLog extends BaseLeaveEntitlementLog
+{
+
+    public function behaviors()
+    {
+        return ArrayHelper::merge(
+            parent::behaviors(),
+            [
+                # custom behaviors
+            ]
+        );
+    }
+
+    public function rules()
+    {
+        return ArrayHelper::merge(
+            parent::rules(),
+            [
+                # custom validation rules
+            ]
+        );
+    }
+
+    /**
+     * 修改假期 记录日志
+     * 
+     * @param string $orderField field to order by
+     * @param string $orderBy order (ASC/DESC)
+     * @return Collection of LeaveEntitlementType
+     * @throws DaoException on an error
+     */
+    public function saveLeaveEntitlementLog(leaveEntitlement $leaveEntitlement,$days,$status) {
+        $entitlementLog =new LeaveEntitlementLog();
+ 
+        $entitlementLog->emp_number = $leaveEntitlement->emp_number; 
+        $entitlementLog->entitlement_id = $leaveEntitlement->id;  
+        $entitlementLog->entitlement_type =(string) $leaveEntitlement->leave_type_id; 
+        $entitlementLog->create_time = date('Y-m-d H:i:s');
+        $entitlementLog->note = $leaveEntitlement->note; 
+        $entitlementLog->create_by_name = $leaveEntitlement->created_by_name; 
+        $entitlementLog->create_by_id = $leaveEntitlement->created_by_id; 
+        if($status==1){
+            $entitlementLog->status = '1';
+            $entitlementLog->days = $days; 
+        }else{
+            $entitlementLog->status = '2';
+            $entitlementLog->days = -abs($days); 
+        }
+        $entitlementLog->no_of_days = $leaveEntitlement->no_of_days;
+
+        $entitlementLog->save();
+        return true;  
+    }
+
+
+
+}

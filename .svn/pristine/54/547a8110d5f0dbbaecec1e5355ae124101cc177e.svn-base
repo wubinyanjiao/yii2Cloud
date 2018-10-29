@@ -1,0 +1,194 @@
+<?php
+
+namespace common\models\shift;
+
+
+use common\models\User;
+use Yii;
+use \common\models\shift\base\RotationRule as BaseRotationRule;
+use yii\helpers\ArrayHelper;
+
+/**
+ * This is the model class for table "ohrm_rotationRule".
+ */
+class RotationRule extends BaseRotationRule
+{
+
+    public function behaviors()
+    {
+        return ArrayHelper::merge(
+            parent::behaviors(),
+            [
+                # custom behaviors
+            ]
+        );
+    }
+
+    public function rules()
+    {
+        return ArrayHelper::merge(
+            parent::rules(),
+            [
+                # custom validation rules
+            ]
+        );
+    }
+    public function getRuleAll($rotationId,$groupId,$ruleType)
+    {
+        $data = self::find()
+            ->where(['rotationId'=>$rotationId,'groupId'=>$groupId,'ruleType'=>$ruleType])
+            ->asArray()
+            ->all();
+        return $data;
+    }
+    public function checkRuleOut($ruleAll,$groupId)
+    {
+        //调出规则
+        foreach ($ruleAll as $k=>$v){
+            switch ($v['rotationRuleWarehouseId']){
+                case 1://职称等级满多长时间轮转
+                    /*$select1 = json_decode($v['select1']);
+                    $input1 = json_decode($v['input1']);
+                    foreach ($select1 as $key=>$val){
+//                        $rule[$val[0]] = $input1[$key];
+                        $title_id = (int)$val[0];
+                        RotationEmployee::updateAll(['isDel'=>2],['and',['title_id'=>$title_id],['work_station'=>(int)$groupId],['<','month',$input1[$key]]]);
+                    }*/
+                    break;
+                case 2://组长副组长不参与轮转
+//                    RotationEmployee::updateAll(['isDel'=>2],['and',['in','is_leader',[1,2]],['work_station'=>(int)$groupId]]);
+                    break;
+                case 3://在组内满几年轮转
+                    /*$select1 = json_decode($v['select1']);
+                    $work_time = $select1[0][0]*12;
+                    RotationEmployee::updateAll(['isDel'=>2],['and',['<','work_time',$work_time],['work_station'=>(int)$groupId]]);*/
+                    break;
+                case 4://仅男生女生
+                    /*$select1 = json_decode($v['select1']);
+                    $emp_gender = $select1[0][0];
+                    RotationEmployee::updateAll(['isDel'=>2],['and',['!=','emp_gender',$emp_gender],['work_station'=>(int)$groupId]]);*/
+                    break;
+                case 5://学历范围
+                    //将二维数组转换为以为数组
+                    /*$select2 = json_decode($v['select2']);
+                    $result = array_reduce($select2, 'array_merge', array());
+                    RotationEmployee::updateAll(['isDel'=>2],['and',['not in','record_id',$result],['work_station'=>(int)$groupId]]);*/
+                    break;
+                case 6://年龄范围
+                    /*$input1 = json_decode($v['input1']);
+                    $input1 = $input1[0];
+                    $input2 = json_decode($v['input2']);
+                    $input2 = $input2[0];
+                    if(empty($input1)){
+                        RotationEmployee::updateAll(['isDel'=>2],['and',['>','age',$input2],['work_station'=>(int)$groupId]]);
+                    }
+                    if(empty($input2)){
+                        RotationEmployee::updateAll(['isDel'=>2],['and',['<','age',$input1],['work_station'=>(int)$groupId]]);
+                    }
+                    if(!empty($input2) && !empty($input2)){
+                        RotationEmployee::updateAll(['isDel'=>2],['and',['not between','age',$input1,$input2],['work_station'=>(int)$groupId]]);
+                    }*/
+//
+                    break;
+            }
+        }
+
+
+    }
+    public function checkRuleIn($ruleAll,$firstEmp,$secondGroup)
+    {
+        //调入规则
+        foreach ($ruleAll as $k1=>$v1){
+            switch ($v1['rotationRuleWarehouseId']){
+                case 7://职称等级平均分配
+                    /*$select1 = json_decode($v1['select1']);
+                    $result = array_reduce($select1, 'array_merge', array());
+                    $title_id = $firstEmp['title_id'];
+                    if($title_id < min($result)){
+                        $message = "职称等级不符";
+                        return $message;
+
+                    }
+                    //获取调出人员的职称,比如调出一个本科和博士
+                    $PrepareOut = json_decode($secondGroup->usersPrepareOut,true);
+                    $userId = array();
+                    foreach ($PrepareOut as $key=>$info)
+                    {
+                        $rotationEmployee = new RotationEmployee();
+                        $out = $rotationEmployee->getrotationEmployeeUserId($info['userId']);
+                        $userId[] = $out['title_id'];
+                    }
+                    if($title_id < min($userId)){
+                        $message = "职称等级不符";
+                        return $message;
+                    }*/
+                    break;
+                case 8://性别平均分配
+                    /*$select1 = json_decode($v1['select1']);
+                    $result = array_reduce($select1, 'array_merge', array());
+                    $emp_gender = $firstEmp['emp_gender'];
+                    if(!in_array($emp_gender,$result)){
+                        $message = "性别不匹配";
+                        return $message;
+                    }*/
+
+                    break;
+                case 9://学历平均分配
+                    /*$select1 = json_decode($v1['select1']);
+                    $result = array_reduce($select1, 'array_merge', array());
+                    $record_id = $firstEmp['record_id'];
+                    if($record_id<min($result)){
+                        $message = "学历不匹配";
+                        return $message;
+                    }
+                    $PrepareOut = json_decode($secondGroup->usersPrepareOut,true);
+                    $userId = array();
+                    foreach ($PrepareOut as $key=>$info)
+                    {
+                        $rotationEmployee = new RotationEmployee();
+                        $out = $firstEmp->getrotationEmployeeUserId($info['userId']);
+                        $userId[] = $out['record_id'];
+                    }
+                    var_dump($userId);
+                    if($record_id < min($userId)){
+                        $message = "学历过低";
+                        return $message;
+                    }*/
+                    break;
+                case 10://年龄平均分配
+                    /*$age = $firstEmp['age'];
+                    $input1 = json_decode($v1['input1']);
+                    $input2 = json_decode($v1['input2']);
+                    if($age<$input1[0] || $age>$input2[0]){
+                        $message = "年龄不匹配";
+                        return $message;
+                    }*/
+                    break;
+                case 11://夫妻不能在一组
+                    //互斥字段,这个人和谁是夫妻
+                    $mutual_exclusion = $firstEmp['mutual_exclusion'];
+                    $name = $firstEmp['emp_firstname'];
+                    $RecommendUnselected = json_decode($secondGroup->usersRecommendUnselected,true);
+                    $PrepareIn = json_decode($secondGroup->usersPrepareIn,true);
+                    foreach ($RecommendUnselected as $key=>$now)
+                    {
+                        if($mutual_exclusion == $now['userId']){
+                            /*$message = $name."和".$now['userName'].'是夫妻关系';
+                            return $message;*/
+                            echo $name."和".$now['userName'].'是夫妻关系';
+                        }
+                    }
+                    foreach ($PrepareIn as $key=>$in)
+                    {
+                        if($mutual_exclusion == $in['userId']){
+                            /*$message = $name."和".$now['userName'].'是夫妻关系';
+                            return $message;*/
+                            echo $name."和".$now['userName'].'是夫妻关';
+                        }
+                    }
+
+                    break;
+            }
+        }
+    }
+}

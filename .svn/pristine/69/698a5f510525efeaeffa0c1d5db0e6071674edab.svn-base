@@ -1,0 +1,524 @@
+<?php
+namespace frontend\controllers\v1;
+
+use Codeception\Util\Template;
+use common\models\honor\Honor;
+use yii\rest\ActiveController;
+use yii\web\Response;
+use yii;
+
+class WordController extends \common\rest\Controller
+{
+
+
+    public $modelClass = 'common\models\honor\Honor';
+
+
+    /**
+     *
+     * @var array
+     */
+    public $serializer = [
+        'class' => 'common\rest\Serializer',    // 返回格式数据化字段
+        'collectionEnvelope' => 'result',       // 制定数据字段名称
+        'message' => 'OK',                      // 文本提示
+    ];
+
+
+
+    /**
+     * @param  [action] yii\rest\IndexAction
+     * @return [type]
+     */
+    public function beforeAction($action)
+    {
+        $format = \Yii::$app->getRequest()->getQueryParam('format', 'json');
+
+        if($format == 'xml'){
+            Yii::$app->response->format = yii\web\Response::FORMAT_XML;
+        }else{
+            Yii::$app->response->format = yii\web\Response::FORMAT_JSON;
+        }
+
+        return $action;
+    }
+
+    /**
+     * @param  [type]
+     * @param  [type]
+     * @return [type]
+     */
+    public function afterAction($action, $result){
+        $result = parent::afterAction($action, $result);
+
+        return $result;
+    }
+
+    public function behaviors()
+    {
+        $behaviors = parent::behaviors();
+        $behaviors['contentNegotiator']['formats']['text/html'] = Response::FORMAT_HTML;
+        return $behaviors;
+    }
+
+    public function actions()
+    {
+        $actions = parent::actions();
+        unset($actions['index']);
+        return $actions;
+    }
+
+
+
+
+
+    /**
+     * @SWG\Get(path="/word/upload-word",
+     *     tags={"云平台-Word-科研"},
+     *     summary="下载",
+     *     description="下载",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "query",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "query",
+     *        name = "emp_number",
+     *        description = "员工id",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回科室荣誉列表"
+     *     ),
+     *     @SWG\Response(
+     *         response = 403,
+     *         description = "查询失败",
+     *     )
+     * )
+     *
+     **/
+    public function actionUploadWord(){
+        $emp_number = yii::$app->request->get();
+        $honor = new Honor();
+        $data = $honor->selresearch($emp_number);
+        return $data;
+        ob_start(); //打开缓冲区
+        echo '
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" >
+        <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+        <xml><w:WordDocument><w:View>Print</w:View></xml>
+        </head>';
+        $str ='<body>
+        '.$data['user']['emp_firstname'].'&nbsp;&nbsp;'.$data['user']['education'].','.$data['user']['role'].'<br>
+        &nbsp;&nbsp;'.$data['user']['emp_gender'].' ，'.$data['user']['minzu'].'，'.$data['user']['emp_birthday'].'， '.$data['user']['emp_other_id'].'&nbsp;&nbsp;&nbsp;&nbsp;<br>
+        &nbsp;&nbsp;西安交通大学第一附属医院   '.$data['user']['work_station'].''.$data['user']['role'].'
+        <table border="0" cellpadding="3" cellspacing="0" width="100%" style="table-layout:fixed;border-collapse:separate;border-spacing:10px 20px;">
+        <tr >
+        <td width="100" valign="center" colspan="100" ><h4>联系方式</h4></td>
+        </tr>
+        <tr >
+        <td width="100" valign="center" colspan="100" >&nbsp;&nbsp;'.$data['user']['custom2'].'</td>
+        </tr>
+        <tr >
+        <td width="100" valign="center" colspan="100" >&nbsp;&nbsp;西安交通大学第一附属医院药学部    邮编：'.$data['user']['emp_street2'].'</td>
+        </tr>';
+
+        if(!empty($data['user']['emp_mobile'])){
+            $str.='<tr >
+        <td width="100" valign="center" colspan="100" >&nbsp;&nbsp;电话：'.$data['user']['emp_mobile'].'</td>
+        </tr>';
+        }
+
+        if(!empty($data['user']['emp_work_email'])){
+            $str.='<tr >
+        <td width="100" valign="center" colspan="100" >&nbsp;&nbsp;email：'.$data['user']['emp_work_email'].'</td>
+        </tr>';
+        }
+
+        if(!empty($data['user']['weixin_code'])){
+            $str.='<tr >
+        <td width="100" valign="center" colspan="100" >&nbsp;&nbsp;微信：'.$data['user']['weixin_code'].'</td>
+        </tr>';
+        }
+
+
+        if(!empty($data['consider'])){
+            $str.='<tr ><td width="100" valign="center" colspan="100" ><h4>研究方向</h4></td></tr>';
+            $num = 1;
+            foreach ($data['consider'] as $k=>$v){
+                $str.='<tr ><td width="100" valign="center" colspan="100" >&nbsp;&nbsp;'.$num.'、'.$v['research'].'</td></tr>';
+                $num ++;
+            }
+
+        }
+        $num = 1;
+
+
+        if(!empty($data['teach'])){
+            $str.='<tr ><td width="100" valign="center" colspan="100" ><h4>教育</h4></td></tr>';
+            foreach ($data['teach'] as $k=>$v){
+                $str.='<tr ><td width="100" valign="center" colspan="100" >&nbsp;&nbsp;'.$num.'、'.$v['start_time'].'至'.$v['end_time'].''.$v['school'].'</td></tr>';
+                $num ++;
+            }
+
+        }
+        $num = 1;
+
+        if(!empty($data['work'])){
+            $str.='<tr><td width="100" valign="center" colspan="100" ><h4>工作</h4></td></tr>';
+            foreach ($data['work'] as $k=>$v){
+                $str.='<tr ><td width="100" valign="center" colspan="100" >&nbsp;&nbsp;'.$num.'、'.$v['time_in'].'至'.$v['time_out'].''.$v['new_department'].'</td></tr>';
+                $num ++;
+            }
+
+        }
+        $num = 1;
+
+        if(!empty($data['project'])){
+            $str.=' <tr ><td width="100" valign="center" colspan="100" ><h4>科研</h4></td></tr>';
+            foreach ($data['project'] as $k=>$v){
+                $str.='<tr ><td width="100" valign="center" colspan="100" >&nbsp;&nbsp;'.$num.'、'.$v['project_name'].'（项目批准号：'.$v['project_number'].'；批准金额：'.$v['money'].'万元；起止年限：'.$v['start_time'].'至'.$v['end_time'].'）</td></tr>';
+                $num ++;
+            }
+
+        }
+        $num = 1;
+
+        if(!empty($data['thesis'])){
+            $str.=' <tr ><td width="100" valign="center" colspan="100" ><h4>论文</h4></td></tr>';
+            foreach ($data['thesis'] as $k=>$v){
+                $str.='<tr ><td width="100" valign="center" colspan="100" >&nbsp;&nbsp;'.$num.'、'.$v['first_author'].'，'.$v['corresponding_author'].','.$v['thesis_name'].','.$v['publication'].','.$v['volume'].'</td></tr>';
+                $num ++;
+            }
+
+        }
+        $num = 1;
+
+        if(!empty($data['meeting'])){
+            $str.=' <tr ><td width="100" valign="center" colspan="100" ><h4>会议</h4></td></tr>';
+            foreach ($data['meeting'] as $k=>$v){
+                $str.='<tr ><td width="100" valign="center" colspan="100" >&nbsp;&nbsp;'.$num.'、'.$data['user']['emp_firstname'].'，'.$v['first_author'].','.$v['corresponding_author'].','.$v['meeting_name'].','.$v['meeting_time'].'</td></tr>';
+                $num ++;
+            }
+
+        }
+        $num = 1;
+
+        if(!empty($data['honor'])){
+            $str.=' <tr ><td width="100" valign="center" colspan="100" ><h4>获奖</h4></td></tr>';
+            foreach ($data['honor'] as $k=>$v){
+                $str.='<tr ><td width="100" valign="center" colspan="100" >&nbsp;&nbsp;'.$num.'、'.$v['reward_time'].''.$v['honor_name'].'</td></tr>';
+                $num ++;
+            }
+
+        }$num = 1;
+
+        if(!empty($data['patent'])){
+            $str.=' <tr ><td width="100" valign="center" colspan="100" ><h4>专利</h4></td></tr>';
+            foreach ($data['patent'] as $k=>$v){
+                $str.='<tr ><td width="100" valign="center" colspan="100" >&nbsp;&nbsp;'.$num.'、'.$v['applicant'].''.$v['patentee'].'.'.$v['patent_name'].'.专利类型：'.$v['patent_type'].'；申请号：'.$v['apply_number'].'；申请日期：'.$v['accept_time'].'；公开日：'.$v['authorization_time'].'</td></tr>';
+                $num ++;
+            }
+
+        }
+        $num = 1;
+
+
+        if(!empty($data['hold'])){
+            $str.=' <tr ><td width="100" valign="center" colspan="100" ><h4>社会兼职</h4></td></tr>';
+            foreach ($data['hold'] as $k=>$v){
+                $str.='<tr ><td width="100" valign="center" colspan="100" >&nbsp;&nbsp;'.$num.'、'.$v['society'].''.$v['job'].'</td></tr>';
+                $num ++;
+            }
+
+        }
+
+        $num = 1;
+
+
+        if(!empty($data['journal'])){
+            $str.=' <tr ><td width="100" valign="center" colspan="100" ><h4>杂志编委</h4></td></tr>';
+            foreach ($data['journal'] as $k=>$v){
+                $str.='<tr ><td width="100" valign="center" colspan="100" >&nbsp;&nbsp;'.$num.'、'.$v['journal_name'].''.$v['job'].'</td></tr>';
+                $num ++;
+            }
+
+        }
+        $num = 1;
+
+        if(!empty($data['writings'])){
+            $str.=' <tr ><td width="100" valign="center" colspan="100" ><h4>专著</h4></td></tr>';
+            foreach ($data['writings'] as $k=>$v){
+                $str.='<tr ><td width="100" valign="center" colspan="100" >&nbsp;&nbsp;'.$num.'、'.$v['editor'].'主编.'.$v['writings_name'].'.'.$v['publish_unit'].'总字数：'.$v['all_count'].'参编字数：'.$v['editor_count'].'</td></tr>';
+                $num ++;
+            }
+        }
+
+
+        echo $str.'</table></body>';
+        header("Cache-Control: no-store"); //所有缓存机制在整个请求/响应链中必须服从的指令
+        Header("Content-type: application/octet-stream");  //用于定义网络文件的类型和网页的编码，决定文件接收方将以什么形式、什么编码读取这个文件
+        Header("Accept-Ranges: bytes");  //Range防止断网重新请求 。
+        if (strpos($_SERVER["HTTP_USER_AGENT"],'MSIE')) {
+            header('Content-Disposition: attachment; filename=test.doc');
+        }else if (strpos($_SERVER["HTTP_USER_AGENT"],'Firefox')) {
+            Header('Content-Disposition: attachment; filename=test.doc');
+        } else {
+            header('Content-Disposition: attachment; filename=test.doc');
+        }
+        header("Pragma:no-cache"); //不能被浏览器缓存
+        header("Expires:0");  //页面从浏览器高速缓存到期的时间分钟数，设定expires属性为0，将使对一页面的新的请求从服务器产生
+        ob_end_flush();//输出全部内容到浏览器
+
+    }
+
+
+
+
+    /*<img src="https://dev.static.ebangong365.com/'.$data['user']['piction'].'" width="120" height="120" />*/
+
+    /**
+     * @SWG\Get(path="/word/demo",
+     *     tags={"云平台-Word-科研"},
+     *     summary="生成word",
+     *     description="生成word",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "query",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "query",
+     *        name = "emp_number",
+     *        description = "员工id",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回科室荣誉列表"
+     *     ),
+     *     @SWG\Response(
+     *         response = 403,
+     *         description = "查询失败",
+     *     )
+     * )
+     *
+     **/
+    public function actionDemo(){
+
+        $emp_number = yii::$app->request->get();
+        $honor = new Honor();
+        $data = $honor->selresearch($emp_number);
+
+
+        //基本信息
+        $user =$data['user'];
+
+        $emp_firstname = $user['emp_firstname'];
+        $path = "/data/wwwroot/uploadfile/word";
+        $filename = $path.'/'.$emp_firstname.'简历.docx';
+        if(file_exists($filename)){
+            @unlink($filename);
+        }
+
+
+        $education = $user['education'];
+        $role = $user['role'];
+        $emp_gender = $user['emp_gender'];
+        $minzu = $user['minzu'];
+        $emp_birthday = $user['emp_birthday'];
+        $emp_other_id = $user['emp_other_id'];
+
+
+        //研究方向
+        $consider = $data['consider'];
+        if(!empty($consider)){
+            $consider_str = '';
+            foreach ($consider as $k => $v){
+                $num = $k+1;
+                $consider_str.=$num.'、'.$v['research'].'<w:br />';
+            }
+            $consider_str = substr($consider_str,0,-8);
+        }else{
+            $consider_str = '暂时没有研究方向';
+        }
+
+        //教育
+        $teach = $data['teach'];
+        if(!empty($teach)){
+            $teach_str = '';
+            foreach ($teach as $k => $v){
+                $num = $k+1;
+                $teach_str.=$num.'、'.$v['end_time'].'毕业于：'.$v['school'].'<w:br />';
+            }
+            $teach_str = substr($teach_str,0,-8);
+        }else{
+            $teach_str = '暂时没有教育经历';
+        }
+
+
+        //工作
+        $work = $data['work'];
+        if(!empty($work)){
+            $work_str = '';
+            foreach ($work as $k => $v){
+                $num = $k+1;
+                $work_str.=$num.'、'.$v['end_time'].'毕业于：'.$v['school'].'<w:br />';
+            }
+            $work_str = substr($work_str,0,-8);
+        }else{
+            $work_str = '暂时没有工作经历';
+        }
+
+        //科研
+        $project = $data['project'];
+        if(!empty($project)){
+            $project_str = '';
+            foreach ($project as $k => $v){
+                $num = $k+1;
+                $project_str.=$num.'、'.$v['source_id'].'项目：'.$v['project_name'].'('.'项目编号：'.$v['project_number'].'；批准金额：'.$v['money'].'万元'.'；起止年限：'.$v['start_time'].'至'.$v['end_time'].')'.'<w:br />';
+            }
+            $project_str = substr($project_str,0,-8);
+        }else{
+            $project_str = '暂时没有科研项目';
+        }
+
+        //论文
+        $thesis = $data['thesis'];
+        if(!empty($thesis)){
+            $thesis_str = '';
+            foreach ($thesis as $k => $v){
+                $num = $k+1;
+                $thesis_str.=$num.'、'.$v['author'].'。'.$v['thesis_name'].'。'.$v['publication'].'。'.$v['volume'].'<w:br />';
+            }
+            $thesis_str = substr($thesis_str,0,-8);
+        }else{
+            $thesis_str = '暂时没有发表论文';
+        }
+
+
+        //会议
+        $meeting = $data['meeting'];
+        if(!empty($meeting)){
+            $meeting_str = '';
+            foreach ($meeting as $k => $v){
+                $num = $k+1;
+                $meeting_str.=$num.'、'.$v['meeting_start_time'].'参加了'.$v['host_unit'].'主办的'.$v['meeting_name'].'<w:br />';
+            }
+            $meeting_str = substr($meeting_str,0,-8);
+        }else{
+            $meeting_str = '暂时没有参加会议';
+        }
+
+        //获奖
+        $honor = $data['honor'];
+        if(!empty($honor)){
+            $honor_str = '';
+            foreach ($honor as $k => $v){
+                $num = $k+1;
+                $honor_str.=$num.'、'.$v['reward_time'].'获得了'.$v['honor_name'].'<w:br />';
+            }
+            $honor_str = substr($honor_str,0,-8);
+        }else{
+            $honor_str = '暂时没有获过奖项';
+        }
+
+        //专利
+        $patent = $data['patent'];
+        if(!empty($patent)){
+            $patent_str = '';
+            foreach ($patent as $k => $v){
+                $num = $k+1;
+                $patent_str.=$num.'、'.$v['patentee'].'。'.$v['patent_name'].'。'.'发明类型：'.$v['leixing'].';'.'申请专利号：'.$v['apply_number'].'申请日期：'.$v['accept_time'].';'.'公告日：'.$v['authorization_time'].'<w:br />';
+            }
+            $patent_str = substr($patent_str,0,-8);
+        }else{
+            $patent_str = '暂时没有获得专利';
+        }
+
+        //社会兼职
+        $hold = $data['hold'];
+        if(!empty($hold)){
+            $hold_str = '';
+            foreach ($hold as $k => $v){
+                $num = $k+1;
+                $hold_str.=$num.'、'.$v['society'].$v['job'].'<w:br />';
+            }
+            $hold_str = substr($hold_str,0,-8);
+        }else{
+            $hold_str = '暂时没有兼职';
+        }
+
+        //专业杂志
+        $journal = $data['journal'];
+        if(!empty($journal)){
+            $journal_str = '';
+            foreach ($journal as $k => $v){
+                $num = $k+1;
+                $journal_str.=$num.'、'.$v['journal_name'].$v['job'].'<w:br />';
+            }
+            $journal_str = substr($journal_str,0,-8);
+        }else{
+            $journal_str = '暂时没有编写任何杂志';
+        }
+
+        //专著
+        $writings = $data['writings'];
+        if(!empty($writings)){
+            $writings_str = '';
+            foreach ($writings as $k => $v){
+                $num = $k+1;
+                $writings_str.=$num.'、'.$v['editor'].'主编；著作名称：'.$v['writings_name'].'；出版单位：'.$v['publish_unit'].'；总字数：'.$v['all_count'].'参编字数：'.$v['editor_count'].'<w:br />';
+            }
+            $writings_str = substr($writings_str,0,-8);
+        }else{
+            $writings_str = '暂时没有任何专著';
+        }
+
+
+        include_once '../../common/word/PHPWord.php';
+        $PHPWord = new \PHPWord();
+        $document = $PHPWord->loadTemplate('/data/wwwroot/uploadfile/word/demo.docx');
+        $document->setValue('name', iconv('utf-8', 'GB2312//IGNORE', $emp_firstname));
+        $document->setValue('education', iconv('utf-8', 'GB2312//IGNORE', $education));
+        $document->setValue('role', iconv('utf-8', 'GB2312//IGNORE', $role));
+        $document->setValue('gender', iconv('utf-8', 'GB2312//IGNORE', $emp_gender));
+        $document->setValue('nation', iconv('utf-8', 'GB2312//IGNORE', $minzu));
+        $document->setValue('birthday', iconv('utf-8', 'GB2312//IGNORE', $emp_birthday));
+        $document->setValue('id', iconv('utf-8', 'GB2312//IGNORE', $emp_other_id));
+        $document->setValue('consider', iconv('utf-8', 'GB2312//IGNORE', $consider_str));
+        $document->setValue('teach', iconv('utf-8', 'GB2312//IGNORE', $teach_str));
+        $document->setValue('work', iconv('utf-8', 'GB2312//IGNORE', $work_str));
+        $document->setValue('project', iconv('utf-8', 'GB2312//IGNORE', $project_str));
+        $document->setValue('thesis', iconv('utf-8', 'GB2312//IGNORE', $thesis_str));
+        $document->setValue('meeting', iconv('utf-8', 'GB2312//IGNORE', $meeting_str));
+        $document->setValue('honor', iconv('utf-8', 'GB2312//IGNORE', $honor_str));
+        $document->setValue('patent', iconv('utf-8', 'GB2312//IGNORE', $patent_str));
+        $document->setValue('hold', iconv('utf-8', 'GB2312//IGNORE', $hold_str));
+        $document->setValue('journal', iconv('utf-8', 'GB2312//IGNORE', $journal_str));
+        $document->setValue('writings', iconv('utf-8', 'GB2312//IGNORE', $writings_str));
+
+        if (!is_dir($path)){ //判断目录是否存在 不存在就创建
+            mkdir($path,0777,true);
+        }
+
+        //保存Word文档
+        $document->save($filename);
+
+        $url = env('STORAGE_HOST_INFO');
+        $fileurl = $url.'word/'.$emp_firstname.'简历.docx';
+        $arr['result'] = $fileurl;
+        return $arr;
+    }
+}

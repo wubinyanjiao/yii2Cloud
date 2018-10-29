@@ -1,0 +1,422 @@
+<?php
+
+namespace common\models\overtime;
+
+use common\models\employee\Employee;
+use common\models\leave\LeaveEntitlement;
+use Yii;
+use \common\models\overtime\base\Overtime as BaseOvertime;
+use yii\helpers\ArrayHelper;
+
+/**
+ * This is the model class for table "ohrm_overtime_list".
+ */
+class Overtime extends BaseOvertime
+{
+
+    public function behaviors()
+    {
+        return ArrayHelper::merge(
+            parent::behaviors(),
+            [
+                # custom behaviors
+            ]
+        );
+    }
+
+    public function rules()
+    {
+        return ArrayHelper::merge(
+            parent::rules(),
+            [
+                # custom validation rules
+            ]
+        );
+    }
+    public function addovertime($data,$firstName,$work_station,$userId){
+        $emp_name = isset($data['emp_name']) ? $data['emp_name'] :'';
+        $emp = Employee::find()->select(['emp_number','work_station'])->where(['emp_firstname'=>$emp_name])->one();
+        if($firstName != 'admin'){
+            if($emp['work_station'] != $work_station){
+                return 2;
+            }
+        }
+
+        $emp_number = $emp['emp_number'];
+        $current_day = isset($data['current_day']) ? $data['current_day'] :'';
+        if($current_day != ''){
+            $current_day=strtotime($current_day);
+            $current_day=date('Y-m-d',$current_day);
+        }
+        $stat_time = isset($data['stat_time']) ? $data['stat_time'] :'';
+        $end_time = isset($data['end_time']) ? $data['end_time'] :'';
+        $is_holiday = isset($data['is_holiday']) ? $data['is_holiday'] :'';
+        $content = isset($data['content']) ? $data['content'] :'';
+
+
+        $hour_differ = $this->return_hour_differ($stat_time,$end_time);
+        $time_differ = $this->return_time_differ($stat_time,$end_time);
+
+        $overtime = new Overtime();
+        $overtime->emp_number = $emp_number;
+        $overtime->creat_time = date('Y-m-d H:i:s',time());
+        $overtime->stat_time = $stat_time;
+        $overtime->end_time = $end_time;
+        $overtime->time_differ = $time_differ;
+        $overtime->hour_differ = $hour_differ;
+        $overtime->current_day = $current_day;
+        $overtime->is_holiday = $is_holiday;
+        $overtime->status = 2;
+        $overtime->is_pro = 1;
+        $overtime->operation_name = $firstName;
+        $overtime->content = $content;
+        $query = $overtime->save();
+
+        if($query){
+            if($is_holiday == 1){
+                if($time_differ > 0.5){
+                    $days = 1;
+                }else{
+                    $days = 0.5;
+                }
+                $leave = new LeaveEntitlement();
+                $info = $leave->changeEntitlementDays($emp_number,$days,1,$note='加班调休',$firstName,$userId);
+                if(!$info){
+                    return false;
+                }
+            }
+
+            if($content == ''){
+                return $query;
+            }else{
+                $overtime_id = $overtime->attributes['id'];
+                $overtimecomment = new OvertimeComment();
+                $overtimecomment->overtime_id = $overtime_id;
+                $overtimecomment->created = date('Y-m-d H:i:s',time());
+                $overtimecomment->created_by_name = $firstName;
+                $overtimecomment->created_by_id = $emp_number;
+                $overtimecomment->created_by_emp_number = $emp_number;
+                $overtimecomment->comments = $content;
+                $query = $overtimecomment->save();
+                if($query){
+                    return true;
+                }else{
+                    return false;
+                }
+            }
+        }else{
+            return false;
+        }
+    }
+
+    public function return_time_differ($stat,$end){
+        if($stat>$end){
+            $end_time = strtotime('+1 days',strtotime($end));
+            $stat_time= strtotime($stat);
+        }else{
+
+            $end_time = strtotime($end);
+            $stat_time= strtotime($stat);
+        }
+        $diff = sprintf("%.2f",($end_time-$stat_time)%86400/3600/8);
+        return $diff;
+    }
+    public function return_hour_differ($stat,$end){
+        if($stat>$end){
+            $end_time = strtotime('+1 days',strtotime($end));
+            $stat_time= strtotime($stat);
+        }else{
+
+            $end_time = strtotime($end);
+            $stat_time= strtotime($stat);
+        }
+        $diff = sprintf("%.2f",($end_time-$stat_time)%86400/3600);
+        return $diff;
+    }
+
+
+
+    public function list($data,$first_name){
+        $stat_time = isset($data['stat_time']) ? $data['stat_time'] :'';
+        $end_time = isset($data['end_time']) ? $data['end_time'] :'';
+        $emp_name = isset($data['emp_name']) ? $data['emp_name'] :'';
+        $is_quit = isset($data['is_quit']) ? $data['is_quit'] :'';
+        $work_station = isset($data['work_station']) ? $data['work_station'] :'';
+        $page = isset($data['page']) ? $data['page'] :'';
+        if($emp_name != ''){
+            $emp = Employee::find()->select(['emp_number','work_station'])->where(['emp_firstname'=>$emp_name])->one();
+            if($first_name != 'admin'){
+                if($emp['work_station'] != $work_station){
+                    return 2;
+                }
+            }
+            $emp_number = $emp['emp_number'];
+        }else{
+            $emp_number = '';
+        }
+
+        $status = isset($data['status']) ? $data['status'] :'';
+        $employee_number = Employee::find()->select(['emp_number'])->asArray()->where(['work_station'=>$work_station])->all();
+        $arr = array();
+        foreach ($employee_number as $k => $v){
+            $arr[] = $v['emp_number'];
+        }
+
+        $arr_string = join(',', $arr);
+
+        if($work_station == '-1'){
+            $where = "1=1";
+        }else{
+            $where = "emp_number in ($arr_string)";
+        }
+        if($stat_time != '' ){
+            $where .= " and current_day > '$stat_time' ";
+        }
+        if($end_time != ''){
+            $where .=" and current_day < '$end_time'";
+        }
+        if($emp_number != ''){
+            $where .= " and emp_number = '$emp_number'";
+        }
+        if($status != ''){
+            $where .= " and status in ($status)";
+        }
+
+        $pagesize = 20;
+        $startrow = ($page-1)*$pagesize;
+
+        $overtime = new Overtime();
+        $query = $overtime::find()->asArray()->where($where)->offset($startrow)->limit($pagesize)->all();
+        $count = $overtime::find()->asArray()->where($where)->count();
+        foreach ($query as $k => $v){
+            $name = Employee::find()->select(['emp_firstname'])->where(['emp_number'=>$v['emp_number']])->one();
+            $query[$k]['emp_name'] = $name['emp_firstname'];
+            if($v['is_holiday'] == '1'){
+                $query[$k]['is_holiday'] = '是';
+            }else{
+                $query[$k]['is_holiday'] = '否';
+            }
+
+            if($v['status'] == -1){
+                $query[$k]['status_name'] = '已拒绝';
+            }elseif ($v['status'] == 0){
+                $query[$k]['status_name'] = '已取消';
+            }elseif ($v['status'] == 1){
+                $query[$k]['status_name'] = '等待批准';
+            }elseif ($v['status'] == 2){
+                $query[$k]['status_name'] = '已安排';
+            }elseif ($v['status'] == 3){
+                $query[$k]['status_name'] = '已使用';
+            }
+
+        }
+        $info['pagesize'] = $pagesize;
+        $info['count'] = (int)$count;
+        $info['query'] = $query;
+        return $info;
+    }
+
+    public function myovertime($data,$emp_number){
+        $start_time = isset($data['start_time']) ? $data['start_time'] :date('Y-m-d',time());
+        if($start_time != ''){
+            $start_time=strtotime($start_time);
+            $start_time=date('Y-m-d',$start_time);
+        }
+
+        $end_time = isset($data['end_time']) ? $data['end_time'] :date('Y-m-d',time());
+        if($end_time != ''){
+            $end_time=strtotime($end_time);
+            $end_time=date('Y-m-d',$end_time);
+        }
+        $status = isset($data['status']) ? $data['status'] :'';
+        $page = isset($data['page']) ? $data['page'] :'';
+
+        $where = "emp_number = '$emp_number'";
+        if($start_time != '' ){
+            $where .= " and current_day > '$start_time' ";
+        }
+        if($end_time != ''){
+            $where .=" and current_day < '$end_time'";
+        }
+        if($status != ''){
+            $where .= " and status in ($status)";
+        }
+        $pagesize = 20;
+        $startrow = ($page-1)*$pagesize;
+        $query = Overtime::find()->asArray()->where($where);
+        $count = $query->count();
+        $query = $query->offset($startrow)->limit($pagesize)->all();
+        $arr['count'] = (int)$count;
+        $arr['pagesize'] = $pagesize;
+        $arr['query'] = $query;
+        return $arr;
+
+    }
+
+
+    public function addcomment($data,$user_id,$first_name){
+        $comment = new OvertimeComment();
+        $comment->overtime_id = $data['overtime_id'];
+        $comment->created = date('Y-m_d H:i:s',time());
+        $comment->created_by_name = $first_name;
+        $comment->created_by_id = $user_id;
+        $comment->created_by_id = $user_id;
+        $comment->created_by_emp_number = $data['emp_number'];
+        $comment->comments = $data['comments'];
+        $query = $comment->save();
+        return $query;
+    }
+
+
+    public function mytimecardlist($data,$emp_number){
+        $page = isset($data['page']) ? $data['page'] :'';
+        $start_time = isset($data['start_time']) ? $data['start_time'] :date('Y-m-d',time());
+        if($start_time != ''){
+            $start_time=strtotime($start_time);
+            $start_time=date('Y-m-d',$start_time);
+        }
+
+        $end_time = isset($data['end_time']) ? $data['end_time'] :date('Y-m-d',time());
+        if($end_time != ''){
+            $end_time=strtotime($end_time);
+            $end_time=date('Y-m-d',$end_time);
+        }
+        $pagesize = 20;
+        $startrow = ($page-1)*$pagesize;
+        $where = "first_daka_time >= '$start_time' and first_daka_time <= '$end_time' and employee_id = '$emp_number'";
+        $query = AttendanceRecord::find()->asArray()->where($where);
+        $query = $query->all();
+        return $query;
+    }
+
+
+
+
+    public function employeetimecardlist($data,$work_station){
+        $start_time = isset($data['start_time']) ? $data['start_time'] :date('Y-m-d',time());
+        if($start_time != ''){
+            $start_time=strtotime($start_time);
+            $start_time=date('Y-m-d',$start_time);
+        }
+
+        $end_time = isset($data['end_time']) ? $data['end_time'] :date('Y-m-d',time());
+        if($end_time != ''){
+            $end_time=strtotime($end_time);
+            $end_time=date('Y-m-d',$end_time);
+        }
+
+
+        $emp = Employee::find()->select(['emp_number'])->where(['emp_firstname'=>$data['emp_name']])->one();
+        if($emp != ''){
+            $emp_number = $emp['emp_number'];
+        }else{
+            $employee_number = Employee::find()->select(['emp_number'])->asArray()->where(['work_station'=>$work_station])->all();
+            $arr = array();
+            foreach ($employee_number as $k => $v){
+                $arr[] = $v['emp_number'];
+            }
+
+            $emp_number = join(',', $arr);
+        }
+
+
+        $where = "first_daka_time >= '$start_time' and first_daka_time <= '$end_time' and employee_id in ($emp_number)";
+        $query = AttendanceRecord::find()->asArray()->where($where)->all();
+        foreach ($query as $k => $v){
+            $name = Employee::find()->select(['emp_firstname'])->where(['emp_number'=>$v['emp_number']])->one();
+            $query[$k]['emp_name'] = $name['emp_firstname'];
+        }
+        return $query;
+    }
+
+
+    public function worklist($data,$work_station,$first_name){
+
+        $shift_time = isset($data['shiht_time'])?$data['shiht_time']:date('Y-m-d',time());
+
+        $emp_name = isset($data['emp_name']) ? $data['emp_name'] :'';
+        if($emp_name != ''){
+            $emp = Employee::find()->select(['emp_number','work_station'])->where(['emp_firstname'=>$emp_name])->one();
+            if($first_name != 'admin'){
+                if($emp['work_station'] != $work_station){
+                    return 2;
+                }
+            }
+            $emp_number = $emp['emp_number'];
+        }else{
+            $emp_number = '';
+        }
+
+        //$work_station = isset($data['work_station'])?$data['work_station']:'';
+
+        $where = "shift_date = '$shift_time' and leave_type = '0' and rest_type= '0'";
+        if($emp_number != ''){
+            $where .= " and a.emp_number = '$emp_number'";
+        }
+        if($work_station != ''){
+            $where .= " and b.work_station = '$work_station'";
+        }
+
+        $query = (new \yii\db\Query())
+            ->select(['a.*','b.emp_firstname','b.work_station'])
+            ->from('orangehrm_mysql.ohrm_work_shift_result a')
+            ->leftJoin('orangehrm_mysql.hs_hr_employee b','a.emp_number=b.emp_number')
+            ->where($where)
+            ->all();
+
+
+
+        return $query;
+    }
+
+    public function getOvertimeListByAPI($arr) {
+
+
+        $empNumber = !empty($arr['empNumber'])?$arr['empNumber']:null;
+        $queryType = isset($arr['queryType'])?$arr['queryType']:null;
+        $is_in_status = !empty($arr['is_in_status'])?$arr['is_in_status']:0;
+        $id = !empty($arr['id'])?$arr['id']:null;
+
+        $q = Overtime::find();
+        $q->joinWith('employee');
+
+        if( !empty($empNumber)){
+            if(is_array($empNumber)){
+                $q->andWhere(['in',"ohrm_overtime_list.emp_number", $empNumber]);
+            } else {
+                $q->andWhere(" ohrm_overtime_list.emp_number = :empNumber",[':empNumber'=>$empNumber]);
+            }            
+        } 
+
+        if(!is_null($queryType)){
+            $q->andWhere('ohrm_overtime_list.status = :status',[':status'=>$queryType]);
+           
+        }else{
+            //$q->andWhere('o.status = ?', 0 );
+        }
+
+        if($id){
+            if (is_numeric($id) && $id > 0) {
+                $q->andWhere('ohrm_overtime_list.id = :id', (int) $id);
+                $record = $q->One();
+            }else if (is_array($id)) {
+                $q->andWhere(['in','ohrm_overtime_list.id',$id]);
+                $q->orderBy('ohrm_overtime_list.creat_time DESC');
+                $record = $q->all();
+            }
+            
+        }else{
+            $q->orderBy('ohrm_overtime_list.creat_time DESC');
+            $record = $q->all();
+        }
+
+        if($record){
+            return $record;
+        }else{
+            return false;
+        }
+      
+    }
+
+
+}

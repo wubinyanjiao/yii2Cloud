@@ -1,0 +1,595 @@
+<?php
+
+namespace common\models\shift;
+
+use Yii;
+use \common\models\shift\base\ShiftResult as BaseShiftResult;
+use yii\helpers\ArrayHelper;
+use common\models\shift\Schedule;
+use common\models\shift\ShiftDate;
+use common\models\shift\ShiftResultConfirm;
+use common\models\shift\ShiftType;
+use common\models\shift\ShiftOrderBy;
+use common\models\shift\EmpSkill;
+use common\models\shift\ShiftTypeDetail;
+use common\models\employee\Employee;
+use common\models\leave\LeaveEntitlement;
+
+
+/**
+ * This is the model class for table "ohrm_work_shift_result".
+ */
+class ShiftResult extends BaseShiftResult
+{
+
+    public function behaviors()
+    {
+        return ArrayHelper::merge(
+            parent::behaviors(),
+            [
+                # custom behaviors
+            ]
+        );
+    }
+
+    public function rules()
+    {
+        return ArrayHelper::merge(
+            parent::rules(),
+            [
+                # custom validation rules
+            ]
+        );
+    }
+
+    public function getShiftResult($schedule_id)
+    {
+        
+        $data = self::find()->where('schedule_id = :sid', [':sid' => $schedule_id])->asArray()->all();
+        return $data;
+    }
+
+    
+    public function addShiftResult($data){
+        if ($this->load($data) && $this->save()){
+            return true;
+        }else {
+             return false;
+        }
+    }
+
+
+    public function delResult($schedule_id)
+    {
+        
+        $data = self::deleteAll('schedule_id = :sid', [':sid' => $schedule_id]);
+        return $data;
+    }
+
+
+    /**
+     * @author 吴斌  2018/4/3 修改 
+     * 获取员工班次信息
+     * @return array $date_format   规范化数组 
+     */
+    public function getResultByEmpAndDate($emp,$shift_date,$schedule_id) {
+        $query = self::find()
+        ->where(['emp_number'=>$emp])
+        ->andWhere(['shift_date'=>$shift_date])
+        ->andWhere(['schedule_id'=>$schedule_id])
+        ->one();
+        return $query;
+    }
+
+
+
+
+     
+
+    /**
+     * @author 吴斌  2018/7/19 修改 
+     * 格式化拼接排班数据
+     * @param array $schedule_id 计划id 
+     * @param int $workStation 组id
+     * @param int $data 日期信息
+     * @return array | 日期
+     */
+
+    public function formatData($schedule_id,$workStation,$data,$if_confrim=null){
+
+
+        $confirmmodel = new ShiftResultConfirm;
+        $resultmmodel = new ShiftResult;
+        $typemode=new ShiftType;
+        $orderbymode=new ShiftOrderBy;
+        $empskillmodel=new EmpSkill;
+
+        $detailmodel=new ShiftTypeDetail;
+
+        $employee=new Employee;
+
+        $leaveenmodel=new LeaveEntitlement;
+
+        $emp_new_all=array();
+
+        //拼接数据
+        if($if_confrim==1){
+            $assignment_list=$this->getShiftResult($schedule_id);
+        }else{
+            $assignment_list=$confirmmodel->getRosterResultConfirm($schedule_id);
+        }
+
+        //获取班次类型信息
+        $shiftTypes=$typemode->getShifType($workStation);
+        $shiftTypes = array_column($shiftTypes, NULL, 'id');
+        
+        //获取参与攀比
+        $emp_new_all=$orderbymode->getShiftOrderByAndEmp($schedule_id);
+
+        if(count($emp_new_all)==0){
+            $emp_new_all=$employee->getEmpByWorkStation($workStation);
+        }
+
+        $emp_new=array_column($emp_new_all, 'emp_number');
+        $emp_new_all=array_column($emp_new_all,NULL, 'emp_number');
+        $date_list=$data['dateList'];
+        $date_list=array_column($date_list,'date');
+
+        $shift_on_result=array();
+        $new_rest['one']=array();
+        $new_rest['half']=array();
+        $new_leave['holday']=array();
+        $new_leave['halfleave']=array();
+        $employeeList=$emp_new;
+
+        //获取夜班id
+        foreach ($shiftTypes as $key_n3 => $value_n3) {
+           if($value_n3['is_night_shift']==1){
+                $night_id=$value_n3['id'];
+           }
+        }
+
+        // $nighEmp=$confirmmodel->getNightInfo($schedule_id,$night_id);
+
+        // //查询有谁在上夜班
+        // var_dump($night_id);exit;
+        foreach ($assignment_list as $ks1 => $va1) {
+
+            if($va1['shift_type_id']>0){
+                $shift_on_result[$ks1]=$va1;
+            }
+            if($va1['leave_type']==1){
+                $new_leave['holday'][$ks1]=$va1;
+            }
+
+            if($va1['leave_type']==2){
+                $new_leave['halfleave'][$ks1]=$va1;
+            }
+
+            if($va1['rest_type']==1){
+                $new_rest['one'][$ks1]=$va1;
+            }
+
+            if($va1['rest_type']==2){
+                $new_rest['half'][$ks1]=$va1;
+            }
+
+            if($va1['shift_type_id']==$night_id){
+                 $night_emp[$va1['emp_number']][$ks1]=$va1;
+            }
+            
+        }
+
+       //每个员工夜班个数
+        foreach ($night_emp as $k_n3 => $v_n3) {
+           $night_data[$k_n3]=count($v_n3);
+        }
+
+        foreach ($new_rest['one'] as $k_n1 => $v_n1) {
+           $new_data1[$v_n1['emp_number']][$k_n1]=$v_n1;
+        }
+        //现有休息天数
+        foreach ($new_data1 as $k_n2 => $v_n2) {
+           $new_da=count($v_n2);
+           if(isset($night_data[$k_n2])){
+             // $tmp_rest=$new_da+$ni=ght_data[$k_n2];
+
+             $if_enough=3-$new_da;
+
+           }else{
+            
+             $if_enough=2-$new_da;
+           }
+           //如果$should_rest>0,每天公休不足两天
+           $should_rest[$k_n2]=$if_enough;
+      
+        }
+
+        
+
+        $shift_on_emp=array_unique(array_column($shift_on_result, 'emp_number'));
+
+
+        foreach ($emp_new as $key => $employee) {
+            if(in_array($employee, $shift_on_emp)){
+                foreach ($shift_on_result as $k => $assignment) {
+                    if($assignment['emp_number']==$employee){
+                        $employee_array[$employee][]=$assignment;
+                    }
+                }
+            }else{
+                $employee_array[$employee][]='';
+            }
+        }
+
+        $emarray=array();
+
+        $empskilldata=array();
+        $skempskill=array();
+
+        //获取员工技能
+        $empskilldata=$empskillmodel->getEmpSkillListByStation($workStation);
+
+        foreach ($empskilldata as $key_skill => $value_skill) {
+            $sklemp=$value_skill['emp_number'];
+            $skempskill[$sklemp][$key_skill]=$value_skill['skill_id'];
+        }
+ 
+        foreach ($employee_array as $key => $employee) {
+            $i=0;
+            $leavid='';
+            $emarray[$key]['empnum']=$key;
+            //获取个人剩余假期数
+            $emarray[$key]['leavecount']=$leaveenmodel->getEntitlementSurplusDay($key,null,null,null,false);
+            $emarray[$key]['name']=$emp_new_all[$key]['emp_firstname'];
+            $emarray[$key]['restcount']=$should_rest[$key];
+            $emarray[$key]['index']=isset($emp_new_all[$key]['shift_index'])?isset($emp_new_all[$key]['shift_index']):$i;
+            $employ_day=array_column($employee,'shift_date');
+            $employ_day=array_unique($employ_day);
+            $diff=array_diff($date_list, $employ_day);
+
+            //判断未安排班次的班是假还是休息
+            if(!empty($diff)){
+
+                foreach ($diff as $difkey=> $difday) {
+                    if($difday==""){
+                        $emarray[$key][$difkey]='';
+                    }else{
+                        $column_name=$difkey;
+                        $confirm_id ='0';        
+                        $if_have_leave=$confirmmodel->getLeaveOfEmpByEmpAndDate($key,$difday);
+
+                        //获取该班次id
+                        if($if_confrim==1){
+                            $confirm=$this->getResultByEmpAndDate($key,$difday,$schedule_id);
+                        }else{
+                            $confirm=$confirmmodel->getConfrimByEmpAndDate($key,$difday,$schedule_id);
+                        }
+                        
+                        if(isset($confirm)){
+                            $confirm_id=$confirm->id;
+                        }
+
+
+                        if($if_confrim==1){
+                           if($if_have_leave){//实时显示假期
+                                $leavefortype=2; 
+                                $emarray[$key][$column_name]['label']=$if_have_leave['name'];
+                                $emarray[$key][$column_name]['type']=$leavefortype;
+                                $emarray[$key][$column_name]['result_id']=$confirm_id;
+                                $emarray[$key][$column_name]['type_id']='';
+                                $emarray[$key][$column_name]['leave_id']=$if_have_leave['id'];
+                            }
+                        }else{
+
+                            if($if_have_leave){//实时显示假期
+                                $leavefortype=2; 
+                                $emarray[$key][$column_name]['label']=$if_have_leave['name'];
+                                $emarray[$key][$column_name]['type']=$leavefortype;
+                                $emarray[$key][$column_name]['result_id']=$confirm_id;
+                                $emarray[$key][$column_name]['type_id']='';
+                                $emarray[$key][$column_name]['leave_id']=$if_have_leave['id'];
+                            }else{
+                                foreach ($new_leave['holday'] as $kh => $vh) {
+                                    if($vh['emp_number']==$key&&$vh['shift_date']==$difday){
+                                        $emarray[$key][$column_name]['label']='假';
+                                        $emarray[$key][$column_name]['result_id']=$confirm_id;
+                                        $emarray[$key][$column_name]['type']=1;
+                                        $emarray[$key][$column_name]['type_id']='';
+                                        $emarray[$key][$column_name]['leave_id']='';
+
+                                    }
+                                }
+                            }
+                            
+                        }
+
+                        if(!isset($emarray[$key][$column_name])){
+                            foreach ($new_rest['one'] as $k4 => $v4) {
+                                if($v4['emp_number']==$key&&$v4['shift_date']==$difday&&$v4['shift_type_id']==-1){
+                                    $emarray[$key][$column_name]['label']='夜休';
+                                    $emarray[$key][$column_name]['result_id']=$confirm_id;
+                                    $emarray[$key][$column_name]['type']=1;
+                                    $emarray[$key][$column_name]['type_id']='';
+                                    $emarray[$key][$column_name]['leave_id']='';
+                                }
+                            }
+                        }
+                        if(!isset($emarray[$key][$column_name])){
+                            $emarray[$key][$column_name]['label']='休息';
+                            $emarray[$key][$column_name]['result_id']=$confirm_id;
+                            $emarray[$key][$column_name]['type']=1;
+                            $emarray[$key][$column_name]['type_id']='';
+                            $emarray[$key][$column_name]['leave_id']='';
+                        }
+                    }
+                    
+                }
+            }
+
+            foreach ($date_list as $ked => $date) {
+                foreach ($employee as $ks => $emday) {
+                    if(isset($emday['shift_date'])&&$date==$emday['shift_date']){
+                        $if_skill_ok=array();
+                        $skilllist=array();
+                        $errLeaveMes='';
+                        $errSkillMes='';
+                        if(is_numeric($emday['shift_type_id'])){
+                            $column_name=$ked;
+                            $type_id=(int)$emday['shift_type_id'];
+                            //判断该班次所需技能
+                            if(isset($shiftTypes[$type_id]['skill_id'])){
+                                $skilllist=(array)json_decode($shiftTypes[$type_id]['skill_id']);
+                            }
+                            //判断员工技能是否与该班次所需技能有交集
+                            if(count($skilllist)>0&&$skilllist[0]!=0){
+                                if(is_array($skilllist)&&isset($skempskill[$key])){
+                                    $if_skill_ok=array_intersect($skilllist,$skempskill[$key]);
+                                    if(count($if_skill_ok)==0){
+                                        $errSkillMes='员工技能与该班次所需技能不匹配';
+                                    }
+                                }else if(is_array($skilllist)&&!isset($skempskill[$key])){
+                                    $errSkillMes='员工技能与该班次所需技能不匹配';
+                                }
+                            }
+                            
+                            $type_name=isset($shiftTypes[$type_id]['name'])?$shiftTypes[$type_id]['name']:'';
+                            $typeforshift=3;
+                            $if_have_leave=$confirmmodel->getLeaveOfEmpByEmpAndDate($key,$date);
+                            
+
+
+                            //判断临时表中是否有数据
+                            $if_exist_tmp=$detailmodel->getShitReslutFromTemp($key,$date);
+     
+                            if(isset($if_exist_tmp)&&count($if_exist_tmp)>0){
+                                foreach ($if_exist_tmp as $kt => $vt) {
+                                    if($vt['time_mark']==1){
+                                        $fir_tmp[$key][$date][$kt]=$shiftTypes[$vt['shift_type_id']]['name'];
+
+                                    }else if($vt['time_mark']==2){
+                                        $fir_sec[$key][$date][$kt]=$shiftTypes[$vt['shift_type_id']]['name'];
+                                       
+                                    }
+
+                                }
+
+                                if(null==$fir_tmp[$key][$date]){
+                                    $fir_tmp[$key][$date][0]='休';
+                                }
+
+                                if(null==$fir_sec[$key][$date]){
+                                    $fir_sec[$key][$date][0]='休';
+                                }
+
+                               
+                                $fir_tmp[$key][$date]=array_values($fir_tmp[$key][$date]);
+                                $fir_sec[$key][$date]=array_values($fir_sec[$key][$date]);
+                                if($fir_tmp[$key][$date][0]!=$fir_sec[$key][$date][0]){
+                                    $type_name=$fir_tmp[$key][$date][0].'/'. $fir_sec[$key][$date][0];
+                                }
+
+                            }
+
+                            if(isset($shiftTypes[$emday['shift_type_id']])&&$shiftTypes[$emday['shift_type_id']]['is_work_half']==1){
+                                //判断是不是半天假
+                                if(isset($new_leave['halfleave'])&&count($new_leave['halfleave'])>0){
+                                        foreach ($new_leave['halfleave'] as $kv => $vv) {
+                                            if($vv['emp_number']==$key&&$vv['shift_date']==$date){
+                            
+                                                if($if_have_leave){
+                                                    if($if_have_leave['duration_type']==1){
+                                                        $leaveName=$if_have_leave['name'].'(上午)';
+                                                    }else if($if_have_leave['duration_type']==2){
+                                                         $leaveName=$if_have_leave['name'].'(下午)';
+                                                    }else{
+                                                         $leaveName=$if_have_leave['name'];
+                                                    }
+                                                    $type_name.='/'.$leaveName;
+                                                    $leavid=$if_have_leave['id'];
+                                                }else{
+                                                    $type_name.='/假';
+                                                }
+
+                                                
+                                            }
+                                        }
+                                    }
+
+                                if(isset($new_rest['half'])&&count($new_rest['half']>0)){
+                                    foreach($new_rest['half'] as $kr => $vr){
+                                        if($vr['emp_number']==$key&&$vr['shift_date']==$date){
+                                            $type_name.='/休';
+                                        }
+                                    }
+                                }
+
+                            }else{
+                                //判断是否假期与班次冲突
+                                if($if_have_leave){
+                                    if($if_have_leave['duration_type']==1){
+                                        $leaveName1=$if_have_leave['name'].'(上午)';
+                                    }else if($if_have_leave['duration_type']==2){
+                                         $leaveName1=$if_have_leave['name'].'(下午)';
+                                    }else{
+                                         $leaveName1=$if_have_leave['name'];
+                                    }
+                                    $errLeaveMes="\n".'假期与班次冲突';
+                                        
+                                }
+                            }
+
+                            if((isset($errLeaveMes)&&!empty($errLeaveMes))||(isset($errSkillMes)&&!empty($errSkillMes))){
+                                $emarray[$key][$column_name]['isError']=true;
+                                $emarray[$key][$column_name]['errorInfo']=$errSkillMes.$errLeaveMes;
+                            }
+                            $emarray[$key][$column_name]['label']=$type_name;
+                            $emarray[$key][$column_name]['result_id']=$emday['id'];
+                            $emarray[$key][$column_name]['type']=$typeforshift;
+                            $emarray[$key][$column_name]['type_id']=$type_id;
+                            $emarray[$key][$column_name]['leave_id']=$leavid;
+                        }
+                    }
+                }
+            }
+            ksort($emarray[$key]);
+
+            $i++;
+        }
+
+        $new_result=array();
+        foreach ($emarray as $key1 => $value1) {
+           $new_result[$key1]['name']=$value1['name'];
+           $new_result[$key1]['index']=$value1['index'];
+           $new_result[$key1]['num']=$value1['empnum'];
+           $new_result[$key1]['leavecount']=$value1['leavecount'];
+           if($value1['restcount']>0){
+               $new_result[$key1]['isError']=true;
+               $new_result[$key1]['errorInfo']='公休不足两天';
+           }
+           $em=$value1['empnum'];
+           unset($value1['name']);
+           unset($value1['index']);
+           unset($value1['empnum']);
+           unset($value1['leavecount']);
+           unset($value1['restcount']);
+
+
+           $tm['type']='check';
+           $tm['id']=$em;
+           $tm['checked']=false;
+           foreach ($value1 as $keya => $valuea) {
+              if($valuea==''){
+                $offset[]=$keya;
+              }
+           }
+    
+           //查找空值的索引
+           $tm['type']='check';
+           $tm['id']=$em;
+           $tm['checked']=false;
+           foreach ($offset as $keyd => $valued) {
+              $value1[$valued]=$tm;
+           }
+
+           $new_result[$key1]['cells']=$value1;
+        }
+        return $new_result;
+    }
+
+
+    /**
+     * @author 吴斌  2018/7/19 修改 
+     * 验证技能
+     * @param array $emp_skill 员工所拥有技能 
+     * @param array $type_skill 班次所需技能
+     * @return array | 日期
+     */
+
+    public function skillCheck($emp_skill,$type_skill){
+
+
+        $if_skill_ok=array();
+         $data=array();
+         if(is_array($emp_skill)&&is_array($type_skill)){
+            $if_skill_ok=array_intersect($emp_skill,$type_skill);
+
+            if(count($if_skill_ok)>0){
+
+                $data['status']=true;
+                $data['message']='员工技能与该班次所需技能匹配';
+
+            }else{
+                $data['status']=false;
+                $data['message']='员工技能与该班次所需技能不匹配';
+            }
+        }
+
+    }
+
+     /**
+     * @author 吴斌  2018/7/19 修改 
+     * 获取班次
+     * @param array $work_station 所属小组 
+     * @param array $start_date 开始日期
+     * @param array $end_date 结束日期 
+     * @param array $type_id 技能id
+     * @param array $emp_num 员工id
+     * @return array | 日期
+     */
+
+    public function getResultList($work_station,$start_date,$end_date,$type_id,$emp_num){
+
+        $query = (new \yii\db\Query())
+        ->select(['a.emp_number','GROUP_CONCAT(a.shift_type_id) type'])
+        ->from('orangehrm_mysql.ohrm_work_shift_result a')
+        ->leftJoin('orangehrm_mysql.ohrm_work_schedule b','b.id = a.schedule_id')
+        ->where(['b.location_id'=>$work_station])
+        ->andWhere(['>','a.shift_type_id',0]);
+
+        if(isset($start_date)&&!empty($start_date)){
+            $query->andWhere(['>','a.shift_date',$start_date]);
+        }
+        if(isset($end_date)&&!empty($end_date)){
+            $query->andWhere(['<','a.shift_date',$end_date]);
+        }
+        if(isset($emp_num)&&!empty($emp_num)){
+            $query->andWhere(['a.emp_number'=>$emp_num]);
+        }
+        if(isset($type_id)&&!empty($type_id)){
+            $query->andWhere(['a.shift_type_id'=>$type_id]);
+        }
+        $data=$query->groupBy(['a.emp_number'])->all();
+      
+        return $data;
+
+    }
+
+
+     /**
+     * @author 吴斌  2018/7/19 修改 
+     * 搜索班次
+     * @param array $emp_num 员工id
+     * @param array $work_station_list 该部门所有小组的id
+     * @return array | 班次统计
+     */
+
+    public function searchShifts($shift_date,$work_station_list){
+
+        $query = (new \yii\db\Query())
+            ->select(['a.*','b.location_id'])
+            ->from('orangehrm_mysql.ohrm_work_shift_result a')
+            ->leftJoin('orangehrm_mysql.ohrm_work_schedule b','b.id = a.schedule_id')
+            ->where(['b.is_confirm'=>1])
+            ->andWhere(['b.is_show'=>1])
+            ->andWhere('a.shift_type_id > 0')
+            ->andWhere(['a.shift_date'=>$shift_date])
+            ->andWhere(['in','b.location_id',$work_station_list])
+            ->all();
+
+        return $query;
+      
+    }
+
+
+}

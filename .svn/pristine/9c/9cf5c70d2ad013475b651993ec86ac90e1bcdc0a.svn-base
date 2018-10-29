@@ -1,0 +1,99 @@
+<?php
+
+namespace common\models;
+
+use Yii;
+use \common\models\base\Leave as BaseLeave;
+use yii\helpers\ArrayHelper;
+
+/**
+ * This is the model class for table "ohrm_leave".
+ */
+class Leave extends BaseLeave
+{
+    private static $doneMarkingApprovedLeaveAsTaken = false;
+
+    public function behaviors()
+    {
+        return ArrayHelper::merge(
+            parent::behaviors(),
+            [
+                # custom behaviors
+            ]
+        );
+    }
+
+    public function rules()
+    {
+        return ArrayHelper::merge(
+            parent::rules(),
+            [
+                # custom validation rules
+            ]
+        );
+    }
+    /**
+     * 修改已同意的假为已使用
+     * @return [type] [description]
+     */
+    public function _markApprovedLeaveAsTaken() {
+        if (self::$doneMarkingApprovedLeaveAsTaken) {
+            return;
+        } else {
+            $date = date('Y-m-d');
+            $update= array('status'=>3);
+            $where = array();
+
+            $query = new Leave();
+            $recod = $query->updateAll(array('status'=>'3'),'date <:date AND status=:status',array(':date'=>$date,':status'=>2));
+
+            if($recod){
+                self::$doneMarkingApprovedLeaveAsTaken = true;
+            }     
+        }
+        return ;
+    }
+
+
+    /**
+     * 修改已同意的假为已使用
+     * @return [type] [description]
+     */
+    public function getLeaveById($id) {
+        $query = Leave::find();
+        $query->where('id = :id',[':id' => $id]);
+        $list  = $query->one();
+        return $list;
+    }
+
+    /**
+     * 查询已使用的假期
+     * @param  [type] $employeeId [description]
+     * @param  [type] $date       [description]
+     * @param  [type] $isApply    [description]
+     * @return [type]             [description]
+     */
+    public function getEmpUserLeave($employeeId,$date,$isApply=false) {
+
+        $this->_markApprovedLeaveAsTaken();
+
+        $query = Leave::find()->asArray();
+        $query->select('l.id,l.date,l.length_days,l.status,l.leave_request_id,l.leave_type_id,l.emp_number,l.duration_type,t.name,t.islimit,t.orderid');
+        $query->from('ohrm_leave l');
+        $query->leftJoin('ohrm_leave_type t', 't.id = l.leave_type_id');
+        $query->where('l.emp_number = :employeeId',[':employeeId' => $employeeId]);
+
+        if($date){
+            $query->andWhere(['in',"l.date", $date]);
+        }
+        if($isApply){
+            $query->andWhere("l.status > 1");
+        }else{
+            $query->andWhere("l.status > 0");
+        }
+
+        $list  = $query->all();
+
+        return $list;
+    }
+}

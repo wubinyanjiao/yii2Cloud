@@ -1,0 +1,45 @@
+<?php
+
+namespace common\models\shift;
+
+use Yii;
+use \common\models\shift\base\ShiftTypeDetail as BaseShiftTypeDetail;
+use yii\helpers\ArrayHelper;
+
+/**
+ * This is the model class for table "ohrm_work_shift_type_detail".
+ */
+class ShiftTypeDetail extends BaseShiftTypeDetail
+{
+
+    public function behaviors()
+    {
+        return ArrayHelper::merge(
+            parent::behaviors(),
+            [
+                # custom behaviors
+            ]
+        );
+    }
+
+    public function rules()
+    {
+        return ArrayHelper::merge(
+            parent::rules(),
+            [
+                # custom validation rules
+            ]
+        );
+    }
+
+    /**
+     * @author 吴斌  2018/4/3 修改 
+     * 获取临时表中信息
+     * @return array $date_format   规范化数组 
+     */
+    public function getShitReslutFromTemp($empId,$shiftDate){
+
+        $data = self::find()->where(['emp_number' => $empId])->andWhere(['shift_date'=>$shiftDate])->orderBy('id ASC')->asArray()->all();
+        return $data;
+    }
+}

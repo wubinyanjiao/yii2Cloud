@@ -1,0 +1,142 @@
+<?php
+
+namespace common\models\shift;
+
+use Yii;
+use \common\models\shift\base\ShiftType as BaseShiftType;
+use yii\helpers\ArrayHelper;
+
+/**
+ * This is the model class for table "ohrm_work_shift_type".
+ */
+class ShiftType extends BaseShiftType
+{
+
+    public function behaviors()
+    {
+        return ArrayHelper::merge(
+            parent::behaviors(),
+            [
+                # custom behaviors
+            ]
+        );
+    }
+
+    public function rules()
+    {
+        return ArrayHelper::merge(
+            parent::rules(),
+            [
+                # custom validation rules
+            ]
+        );
+    }
+
+    public function addShifType($data){
+
+       $data['ShiftType']['create_at']=date('Y-m-d',time());
+
+        if ($this->load($data) && $this->save()) {
+            return true;
+        }
+        return false;
+    }
+
+    public function getShifType($location_id){
+        $query = self::find()
+        ->where('status > 0');
+        if(is_array($location_id)){
+             $query->andWhere(['in','location_id',$location_id]);
+        }else{
+            $query ->andWhere('location_id = :location_id', [':location_id' => $location_id]);
+        }
+        
+
+        $data=$query->orderBy('id desc')->asArray()->all();
+
+        return $data;
+    }
+
+     /**
+     * @author 吴斌  2018/1/11 修改 
+     * 查找组下类型
+     * @param int $location_id 组id
+     * @param int $page 页码
+     * @param int $pageSize 每页显示多少条数据
+     * @return Array | 对象
+     */
+
+
+    public function getShifTypeByPage($location_id,$page=null,$pageSize=null){
+        $query = self::find()
+        ->where('location_id = :location_id', [':location_id' => $location_id]);
+
+        $count=$query->count();
+        $data['totalCount']=$count;
+        $startrow = ($page-1)*$pageSize;
+        $data['data']=$query->offset($startrow)->limit($pageSize)->asArray()->all();
+        return $data;
+    }
+
+    public function getShifTypeById($type_id){
+        $shiftTypeList = self::find()->where('id = :type_id', [':type_id' => $type_id])->orderBy('id desc')->asArray()->one();
+
+        return $shiftTypeList;
+    }
+
+    
+
+    public function updateType($data){
+        $typeid=(int)$data['id'];
+        $data['create_at']=date('Y-m-d',time());
+        $name=$data['name'];
+        $start_time=$data['start_time'];
+        $end_time=$data['end_time'];
+        $is_grant=$data['is_grant'];
+        $is_night_shift=$data['is_night_shift'];
+        $is_amont_work=$data['is_amont_work'];
+        $require_employee=$data['require_employee'];
+        $week_select=$data['week_select'];
+        $start_time_afternoon=$data['start_time_afternoon'];
+        $end_time_afternoon=$data['end_time_afternoon'];
+        $color=$data['color'];
+        $status=$data['status'];
+        $is_work_overtime=$data['is_work_overtime'];
+        $is_work_half=$data['is_work_half'];
+        $clock_in=$data['clock_in'];
+        $is_daka_half=$data['is_daka_half'];
+        $remark=$data['remark'];
+        $is_approval=$data['is_approval'];
+        $duty_factor=$data['duty_factor'];
+        $skill_list=$data['skill_id'];
+        $typeEntity['ShiftType']=$data;
+
+        if ($this->load($typeEntity) && $this->validate()) {
+            return (bool)$this->updateAll([
+                'name' => $name,
+                'start_time' => $start_time,
+                'end_time' => $end_time,
+                'require_employee' => $require_employee,
+                'is_grant' => $is_grant,
+                'is_night_shift' => $is_night_shift,
+                'duty_factor' => $duty_factor,
+                'is_amont_work' => $is_amont_work,
+                'week_select' => $week_select,
+                'start_time_afternoon' => $start_time_afternoon,
+                'end_time_afternoon' => $end_time_afternoon,
+                'is_work_overtime' => $is_work_overtime,
+                'is_work_half' => $is_work_half,
+                'clock_in' => $clock_in,
+                'is_daka_half' => $is_daka_half,
+                'remark' => $remark,
+                'is_approval' => $is_approval,
+                'skill_id' => $skill_list,
+                'color' => $color,
+                'status' => $status
+            ], 'id = :id', [':id' => $typeid]);
+        }
+        
+    }
+
+    
+}

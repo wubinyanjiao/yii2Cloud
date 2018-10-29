@@ -1,0 +1,584 @@
+<?php
+
+namespace common\models\system;
+
+use Yii;
+use yii\helpers\ArrayHelper;
+use \common\models\leave\LeaveRequest;
+use \common\models\leave\LeaveType;
+use \common\models\attendance\ApproverTab;
+use \common\models\overtime\Overtime;
+use \common\models\attendance\AttendanceRecord;
+use \common\models\shift\ShiftResult;
+use \common\models\shift\ShiftChangeApply;
+use \common\models\shift\ShiftType;
+use \common\models\system\SystemUsers;
+
+
+
+/**
+ * This is the model class for table "weixin_member".
+ */
+class AppSys 
+{
+
+    public function behaviors()
+    {
+        return ArrayHelper::merge(
+            parent::behaviors(),
+            [
+                # custom behaviors
+            ]
+        );
+    }
+
+    public function rules()
+    {
+        return ArrayHelper::merge(
+            parent::rules(),
+            [
+                # custom validation rules
+            ]
+        );
+    }
+
+   //获取请假信息
+    public function getLeaveList($empNumber,$queryType){
+        $nowtime =date('Y-m-d H:i:s');
+        $LeaveRequest = new LeaveRequest();
+        $ApproverTab = new ApproverTab();
+        $arr = array('empNumber'=>$empNumber,'queryType'=>$queryType,'is_in_status'=>0);
+        $leave_list = $LeaveRequest->getLeaveRequestByAPI($arr);
+
+
+        $leave_list = array_unset_tt($leave_list,'id');
+
+        $leave_arr = array();
+        $list = array();
+        foreach($leave_list as $key=>$val){
+            $leave_arr['id'] = $val['id'];
+            $leave_arr['type'] = 1;
+            $leave_arr['queryType'] = $queryType;
+            $leave_arr['name'] = $val['leaveType']['name'];
+            $leave_arr['note'] = $val['comments'];          $leave_arr['time'] = $val['create_time'];
+            $leave_arr['beforeTime'] = getTimeConversionNew(floor((strtotime($nowtime)-strtotime($val['create_time']))/60),$val['create_time']);
+
+         
+
+            $stat_time = '';
+            $end_time  = '';
+            $statDay = '';
+            $endDay = '';
+            $lengthDay = 0;  
+
+            $sup_list = $ApproverTab->getApplicantBySubEmployee($empNumber,$val['id'],1);
+            
+
+            if($queryType==1){
+                if(!empty($sup_list['sup'])){
+                    $leave_arr['operation'] = '等待 '.$sup_list['sup']. '审核';
+
+                }else{
+                    $leave_arr['operation'] ='等待 组长 审核';
+                }
+            }else if($queryType==2){
+                if(!empty($sup_list['gre'])){
+                    $leave_arr['operation'] = $sup_list['gre'].' 审核同意';
+                }else{
+                    $leave_arr['operation'] = '组长 审核同意';
+                }
+            }else if($queryType==-1){
+                if(!empty($sup_list['gre'])){
+                    $leave_arr['operation'] =$sup_list['gre'].' 审核拒绝';
+                }else{
+                    $leave_arr['operation'] ='组长 审核拒绝';
+
+                }
+            }else{
+                return false;
+            }
+            $list[] = $leave_arr;
+        }
+
+        return $list;
+    }
+
+
+    //获取加班信息
+    public function getOverList($empNumber,$queryType){
+
+        $nowtime =date('Y-m-d H:i:s');
+        $Overtime = new Overtime();
+        $ApproverTab = new ApproverTab();
+        $arr = array('empNumber'=>$empNumber,'queryType'=>$queryType,'is_in_status'=>0);
+        $over_list = $Overtime->getOvertimeListByAPI($arr);
+
+        $over_list = array_unset_tt($over_list,'id');
+        $over_arr = array();
+        $list = array();
+
+
+        foreach($over_list as $key=>$val){
+            $over_arr['id'] = $val['id'];
+            $over_arr['type'] = 2;
+            $over_arr['queryType'] = $queryType;
+            $over_arr['name'] = '加班';
+            $over_arr['time'] = $val['creat_time'];
+            $over_arr['beforeTime'] = getTimeConversionNew(floor((strtotime($nowtime)-strtotime($val['creat_time']))/60),$val['creat_time']);
+
+            $sup_list = $ApproverTab->getApplicantBySubEmployee($empNumber,$val['id'],2);
+
+            if($queryType==1){
+                if(!empty($sup_list['sup'])){
+                    $over_arr['operation'] = '等待 '.$sup_list['sup']. '审核';
+
+                }else{
+                    $over_arr['operation'] ='等待 组长 审核';
+                }
+            }else if($queryType==2){
+                if(!empty($sup_list['gre'])){
+                    $over_arr['operation'] = $sup_list['gre'].' 审核同意';
+                }else{
+                    $over_arr['operation'] = '组长 审核同意';
+                }
+            }else if($queryType==-1){
+                if(!empty($sup_list['gre'])){
+                    $over_arr['operation'] =$sup_list['gre'].' 审核拒绝';
+                }else{
+                    $over_arr['operation'] ='组长 审核拒绝';
+
+                }
+            }else{
+                return false;
+            }
+
+            $list[] = $over_arr;
+        }
+        return $list;
+    }
+
+
+    //获取打卡信息
+    public function getAtteList($empNumber,$queryType){
+        $nowtime =date('Y-m-d H:i:s');
+        $AttendanceRecord = new AttendanceRecord();
+        $ApproverTab = new ApproverTab();
+
+
+        $arr = array('empNumber'=>$empNumber,'queryType'=>$queryType,'is_in_status'=>0);
+        $list = array();
+
+        $atte_list = $AttendanceRecord->searchAttendanceRecordsByAPI($arr);
+
+
+        $atte_list = array_unset_tt($atte_list,'id');
+        foreach($atte_list as $key=>$val){
+            $atte_arr['id'] = $val['id'];
+            $atte_arr['type'] = 3;
+            $atte_arr['queryType'] = $queryType;
+
+            if($val['is_in_status']==1){
+                $atte_arr['name'] = '上班漏打卡';
+            }else if($val['is_in_status']==2){
+                $atte_arr['name'] = '下班漏打卡';
+            }
+            $atte_arr['time'] = $val['create_time'];
+
+            $atte_arr['beforeTime'] = getTimeConversionNew(floor((strtotime($nowtime)-strtotime($val['create_time']))/60),$val['create_time']);
+          //  $atte_arr['waitFortime'] = '已等待'.floor((strtotime($nowtime)-strtotime($val['create_time']))/60).'分钟';
+            $sup_list = $ApproverTab->getApplicantBySubEmployee($empNumber,$val['id'],3);
+            if($queryType==1){
+                if(!empty($sup_list['sup'])){
+                    $atte_arr['operation'] = '等待 '.$sup_list['sup']. '审核';
+
+                }else{
+                    $atte_arr['operation'] ='等待 组长 审核';
+                }
+            }else if($queryType==2){
+                if(!empty($sup_list['gre'])){
+                    $atte_arr['operation'] = $sup_list['gre'].' 审核同意';
+                }else{
+                    $atte_arr['operation'] = '组长 审核同意';
+                }
+            }else if($queryType==-1){
+                if(!empty($sup_list['gre'])){
+                    $atte_arr['operation'] =$sup_list['gre'].' 审核拒绝';
+                }else{
+                    $atte_arr['operation'] ='组长 审核拒绝';
+
+                }
+            }else{
+                return false;
+            }
+            
+            $list[] = $atte_arr;
+        }
+
+        return $list;
+    }
+    
+    //获取调班信息
+    public function getShiftApplyList($empNumber,$queryType){
+        $nowtime =date('Y-m-d H:i:s');
+        $ApproverTab = new ApproverTab();
+
+        //查询调班 
+        $shiftApplyList = $ApproverTab->getApplicantBySubEmployee($empNumber,'',4,$queryType);
+
+        $shiftApplyList = array_unset_tt($shiftApplyList,'shift_apply_id');
+        $shift_arr = array();
+        $list = array();
+
+        //var_dump($shiftApplyList);die;
+
+        foreach($shiftApplyList as $key=>$val){
+            $shift_arr['id'] = $val['shift_apply_id'];
+            $shift_arr['type'] = 4;
+            $shift_arr['queryType'] = $queryType;
+            $shift_arr['name'] = '调班';
+            $shift_arr['note'] = '';    
+
+            if($val['shift_apply_id']){
+                $shift_apply = $ApproverTab->getWorkShiftChangeApplyById($val['shift_apply_id']);
+                if($shift_apply){
+                     $shift_arr['time'] = $shift_apply->create_at;
+                     $shift_arr['beforeTime'] = getTimeConversionNew(floor((strtotime($nowtime)-strtotime($shift_apply->create_at))/60),$shift_apply->create_at) ;
+                }else{
+                    continue;
+                     $shift_arr['time'] = date('Y-m-d');
+                     $shift_arr['beforeTime'] = '刚刚';
+                }
+            }else{
+                ;continue;
+                 $shift_arr['time'] = date('Y-m-d');
+                 $shift_arr['beforeTime'] = '刚刚';
+            }  
+            // $shift_arr['time'] = $val['create_time'];
+            // $shift_arr['beforeTime'] = $EmployeeService->getTimeConversion(floor((strtotime($nowtime)-strtotime($val['create_time']))/60)) . '之前';
+            if($queryType==1){
+                if(!empty($val['supervisor'])){
+                    $shift_arr['operation'] = '等待 '.$val['supervisor']['emp_firstname']. ' 审核';
+
+                }else{
+                    $shift_arr['operation'] ='等待 组长 审核';
+                }
+            }else if($queryType==2){
+                if(!empty($val['supervisor'])){
+                    $shift_arr['operation'] = $val['supervisor']['emp_firstname'].' 审核同意';
+                }else{
+                    $shift_arr['operation'] = '组长 审核同意';
+                }
+            }else if($queryType==-1){
+                if(!empty($val['supervisor'])){
+                    $shift_arr['operation'] =$val['supervisor']['emp_firstname'].' 审核拒绝';
+                }else{
+                    $shift_arr['operation'] ='组长 审核拒绝';
+
+                }
+            }else{
+                return false;
+            }
+
+            $list[] = $shift_arr;
+        }
+
+        return $list;
+    }
+
+
+    /**
+     * *
+     * @param  [type]  $empNumber [description]
+     * @param  integer $queryType 状态 1 申请中 2同意 0取消 -1拒绝
+     * @param  integer $type      类型 1休假 2加班 3漏打卡 4调班
+     * @param  integer $isSub     1 empNumber 为申请人  2empNumber为审批人
+     * @return [type]             [description]
+     */
+    public function getApplicationList($empNumber,$queryType = 1,$type = 0,$isSub = 1,$offset = 0,$limit = 0){
+        $ApproverTab = new ApproverTab();
+        $LeaveRequest = new LeaveRequest();
+
+        $LeaveType= new LeaveType();
+
+        //$leavetypeList = $LeaveType->getLeaveTypeList(0);
+        
+
+        $leavetype = array();
+        $nowtime =date('Y-m-d H:i:s');
+
+
+
+        $reslut = $ApproverTab->getApplicationListByEmp($empNumber,$queryType,$type,$isSub,$offset,$limit);
+
+        $list = $reslut['data'];
+        $count = $reslut['count'];
+        $backArr = array();
+        foreach ($list as $key => $value) {
+            $arr = array();
+            if($value->app_type==1){
+                $id = $value->leave_id;
+                $type = 1;
+                $leaveRequest = $LeaveRequest->getLeaveRequestById($id);
+                $name = $leaveRequest->leaveType->name;
+            }else if($value->app_type==2){  
+                $id = $value->overtime_id;
+                $type = 2;
+                $name = '加班调休';
+            }else if($value->app_type==3){
+                $id = $value->attend_id;    
+                $type = 3;
+                $name = '上班漏打卡';
+                
+                
+            }else if($value->app_type==4){
+                $id = $value->shift_apply_id;
+                $type = 4;
+                $name = '调班';
+            }
+
+            $arr['id'] = $id;
+            $arr['type'] = $type;
+            $arr['queryType'] = $queryType;
+            $arr['name'] = $name;
+            $arr['note'] = '';    
+            $arr['time'] = $value->create_time;
+            $arr['beforeTime'] = getTimeConversionNew(floor((strtotime($nowtime)-strtotime($value->create_time))/60),$value->create_time) ;
+
+            $sup_list = $ApproverTab->getApplicantBySubEmployee($value->sub_employee,$id,$type);
+
+            if($queryType==1){
+                if($isSub==1){
+                    if(!empty($sup_list['sup'])){
+                        $arr['operation'] = '等待 '.$sup_list['sup'].' 审核';
+                    }else{
+                        $arr['operation'] = '等待 组长 审核';
+                    }
+                }else{
+                    $arr['operation'] = $sup_list['sub'].'等待您 审核';
+                }
+                
+            }else if($queryType==2){
+                if(!empty($sup_list['gre'])){
+                    $arr['operation'] = $sup_list['gre'].' 审核同意';
+                }else{
+                    $arr['operation'] = '组长 审核同意';
+                }
+            }else if($queryType==-1){
+                if(!empty($sup_list['gre'])){
+                    $arr['operation'] = $sup_list['gre'].' 审核拒绝';
+                }else{
+                    $arr['operation'] = '组长 审核拒绝';
+                }
+            }else{
+                return false;
+            }
+
+
+            $backArr[] = $arr;
+
+
+            
+        }
+
+
+        return array('data'=>$backArr,'totalCount'=>$count);
+    }
+
+    /**
+     * *
+     * @param  [type]  $empNumber 审批人id
+     * @param  integer $queryType 要修改的类型
+     * @param  integer $type      要修改的种类
+     * @return [type]             [description]
+     */
+    public function saveApplicationListAll($empNumber = null,$queryType=1,$type =0){
+        $ApproverTab = new ApproverTab();
+        $Leave = new LeaveRequest();
+        $Overtime = new Overtime();
+        $Attendance = new AttendanceRecord();
+        $ShiftResult = new ShiftResult();
+        $ShiftChangeApply = new ShiftChangeApply();
+        $ShiftType=new ShiftType;
+        $status = 2;
+        $list = $ApproverTab->getApplicationListAll($empNumber,$queryType,$type);
+
+        if(!empty($list)){
+            
+            foreach ($list as $key => $value) {
+                $jsdType = $value->app_type;
+                if($jsdType==1){
+                    $id = $value->leave_id;
+                    $data = $Leave->getLeaveRequestById($id);
+                    if($data){
+                        if($data->is_pro!=1){
+                            $ApproverTab->updateStatusById($id,$jsdType,$data->is_pro,$empNumber);
+                            continue;
+                        }
+                        if($data->leave){
+                            foreach($data->leave as $k=>$v){
+                                $isUp = true;
+                                $v->status = $status ;
+                                $v->save();
+                            }
+                            $data->is_pro = $status;
+                            $data->save();
+                        }
+
+                        $ApproverTab->updateStatusById($id,$jsdType,$status,$empNumber);
+
+                    }else{  //不存在就删除
+                        $ApproverTab->deleteById($id,$jsdType);
+                    }
+                }else if($jsdType==2){
+                    $id = $value->overtime_id;
+                    $data = $Overtime->getOvertimeById($id);
+                    if($data){
+                        if($data->status!=1){
+                            $ApproverTab->updateStatusById($id,$jsdType,$data->status,$empNumber);
+                            continue;
+                        }   
+
+                        $Overtime->updateOvertimeStatus($id,2); 
+                        // $data->is_pro = $status;
+                        // $data->status = $status;
+                        // $data->save();
+                        //$ApproverTab->updateStatusById($id,$jsdType,$status,$empNumber);
+
+                    }else{  //不存在就删除
+                        $ApproverTab->deleteById($id,$jsdType);
+                    }
+ 
+                }else if($jsdType==3){
+                    $id = $value->attend_id;
+                    $data = $Attendance->getAttendanceRecordById($id);
+                    if($data){
+                        if($data->is_pro!=1){
+                            $ApproverTab->updateStatusById($id,$jsdType,$data->is_pro,$empNumber);
+                            continue;
+                        }    
+                        $data->is_pro = $status;
+                        $data->save();
+                        $ApproverTab->updateStatusById($id,$jsdType,$status,$empNumber);
+
+                    }else{  //不存在就删除
+                        $ApproverTab->deleteById($id,$jsdType);
+                    }
+ 
+                }else if($jsdType==4){
+                    $id = $value->shift_apply_id;
+                    $data = $ShiftChangeApply->getShiftChangeApplyById($id);
+
+
+                    if($data){
+                        if($data->status!=1){
+                            $ApproverTab->updateStatusById($id,$jsdType,$data->status,$empNumber);
+                            continue;
+                        } 
+                        $orangeType = $data->orange_type;
+                        $orangeTypEntity=$ShiftType->getShifTypeById($orangeType);
+
+                        $confirmType = $data->confirm_type;
+                        $newShiftType =$ShiftType->getShifTypeById($confirmType);
+
+                        $isUp =$ShiftResult->confirmShiftNoLeave($data->schedule_id,$data->shift_date,$data->orange_emp,$data->confirm_emp,$data->orange_type,$data->confirm_type,$data->time_mark,null,$orangeTypEntity,$newShiftType);
+                        
+                        if($isUp['status']){
+                            $data->status = $status;
+                            $data->save();
+                            $ApproverTab->updateStatusById($id,$jsdType,$status,$empNumber);
+                        }
+                        
+
+                    }else{  //不存在就删除
+                        $ApproverTab->deleteById($id,$jsdType);
+                    }
+ 
+                }
+            }
+            return true;
+
+        }else{
+            return false;
+        }
+    }
+
+    /**
+     * 发送通知
+     * @return [type] [description]
+     */
+    public function sendWeiXinNotice($post){
+
+        $params = Yii::$app->params;
+                // $param['type'] = 1;
+                // $param['approver'] = $v['supId'];
+                // $param['sendId'] = $this->empNumber;
+                // $param['firsteHead'] = '您好，您有一条新审核提醒';
+                // $param['keyword2'] = date('Y-m-d H:i:s');
+                // $param['keyword3'] = '点击查看';
+        $type = !empty($post['type'])?$post['type']:false;
+        $approver = !empty($post['approver'])?$post['approver']:false;  //审批人
+        $sendId = !empty($post['sendId'])?$post['sendId']:false;        //申请人
+        // $approver = 802;
+        //$sendId = 803;
+        $firsteHead = !empty($post['firsteHead'])?$post['firsteHead']:false;
+
+        $keyword2 = !empty($post['keyword2'])?$post['keyword2']:false;
+        $keyword3 = !empty($post['keyword3'])?$post['keyword3']:false;
+        $footer = !empty($post['footer'])?$post['footer']:false;
+        $url = !empty($post['url'])?$post['url']:null;
+
+        if($url){
+            $backurl = $params['WEIXINBACKURL'].$url;
+        }else{
+            $backurl = null;
+        }
+
+        $firsteName = '';
+
+        $SystemUsers = new SystemUsers();
+        if($approver){
+            $user=$SystemUsers->searchSystemUsersById($approver,true);
+            if(!empty($user)&&!empty($user['open_id'])){
+                $openid = $user['open_id'];
+                $customer_id = $user['customer_id'];
+
+                $templateId = @$params['templateId'][$customer_id];
+                
+                if(empty($templateId)){
+                    return false;
+                }
+                $templateId = $templateId['default'];
+            }else{
+                return false;
+            }
+        }else{
+            return  false;
+        }
+
+        if(empty($sendId)){
+            return false;
+        }else{
+            $emp = $SystemUsers->searchSystemUsersById($sendId,true);
+
+            $firsteName = $emp['employee']['emp_firstname'];
+        }
+
+        if(empty($firsteName)){
+            return false;
+        }
+        if(empty($openid)){
+            return false;
+        }
+
+        $openid = $openid;
+        $customer_id = $customer_id;
+        $keyword1 = $firsteName;
+        $keyword2 = $keyword2;
+        $keyword3 = $keyword3;
+        return false;
+        $res = weiXinNotice($customer_id,$openid,$templateId,$firsteHead,$keyword1,$keyword2,$keyword3,$footer,$backurl);
+        return $res;         
+
+    }
+
+}

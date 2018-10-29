@@ -1,0 +1,16 @@
+include:
+  - tests/common
+  - tests/console
+  - tests/backend
+  - tests/frontend
+
+paths:
+  log: tests/_output
+
+settings:
+  colors: true
+
+db:
+  dsn:
+  username:
+  password:

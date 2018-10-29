@@ -1,0 +1,286 @@
+<?php
+namespace frontend\controllers\v1;
+
+use common\models\curriculum\Curriculum;
+use common\models\curriculum\CurriculumFile;
+use common\models\overtime\ShiftResult;
+use yii\web\Response;
+use yii;
+
+class AchievementsController extends \common\rest\Controller
+{
+
+
+    /**
+     * @var string
+     */
+    public $modelClass = 'common\models\Curriculum';
+
+    /**
+     * @var array
+     */
+    public $serializer = [
+        'class' => 'common\rest\Serializer',    // 返回格式数据化字段
+        'collectionEnvelope' => 'data',       // 制定数据字段名称
+        'message' => '操作成功',                      // 文本提示
+    ];
+
+
+    /**
+     * @param  [action] yii\rest\IndexAction
+     * @return [type]
+     */
+    public function beforeAction($action)
+    {
+        $format = \Yii::$app->getRequest()->getQueryParam('format', 'json');
+
+        if ($format == 'xml') {
+            \Yii::$app->response->format = \yii\web\Response::FORMAT_XML;
+        } else {
+            \Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+        }
+
+        return $action;
+    }
+
+    /**
+     * @param  [type]
+     * @param  [type]
+     * @return [type]
+     */
+    public function afterAction($action, $result)
+    {
+        $result = parent::afterAction($action, $result);
+
+        return $result;
+    }
+
+    public function behaviors()
+    {
+        $behaviors = parent::behaviors();
+        $behaviors['contentNegotiator']['formats']['text/html'] = Response::FORMAT_HTML;
+        return $behaviors;
+    }
+
+
+    public function actions()
+    {
+        $actions = parent::actions();
+        unset($actions['index']);
+        return $actions;
+    }
+
+
+
+    /**
+     * @SWG\Post(path="/achievements/scheduling",
+     *     tags={"云平台-Achievements-绩效管理"},
+     *     summary="排班统计",
+     *     description="排班统计",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "time",
+     *        description = "时间",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回排班信息"
+     *     ),
+     * )
+     *
+     **/
+    public function actionScheduling()
+    {
+        $time = yii::$app->request->post('time');
+        $customer_id = $this->customerId;
+        $result = new ShiftResult();
+        $model = $result->scheduling($time,$customer_id);
+        return $model;
+    }
+
+
+
+    /**
+     * @SWG\Post(path="/achievements/scheduling-details",
+     *     tags={"云平台-Achievements-绩效管理"},
+     *     summary="排班统计详情",
+     *     description="排班统计详情",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "time",
+     *        description = "时间",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "id",
+     *        description = "组id",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回排班信息"
+     *     ),
+     * )
+     *
+     **/
+    public function actionSchedulingDetails(){
+        $time = yii::$app->request->post('time');
+        $id = yii::$app->request->post('id');
+        $result = new ShiftResult();
+        $model = $result->schedulingdetails($time,$id);
+        return $model;
+    }
+
+
+
+    /**
+     * @SWG\Post(path="/achievements/vacation",
+     *     tags={"云平台-Achievements-绩效管理"},
+     *     summary="假期统计",
+     *     description="假期统计",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "start_time",
+     *        description = "开始时间",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "end_time",
+     *        description = "结束时间",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回假期信息"
+     *     ),
+     * )
+     *
+     **/
+    public function actionVacation(){
+        $start_time = yii::$app->request->post('start_time');
+        $end_time = yii::$app->request->post('end_time');
+        $customer_id = $this->customerId;
+        $workStation = $this->workStation;
+        $result = new ShiftResult();
+        $model = $result->vacation($start_time,$end_time,$workStation,$customer_id);
+        return $model;
+    }
+
+
+    /**
+     * @SWG\Post(path="/achievements/vacation-details",
+     *     tags={"云平台-Achievements-绩效管理"},
+     *     summary="假期详情",
+     *     description="假期详情",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "start_time",
+     *        description = "开始时间",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "end_time",
+     *        description = "结束时间",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "id",
+     *        description = "组id",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回假期信息"
+     *     ),
+     * )
+     *
+     **/
+    public function actionVacationDetails(){
+        $start_time = yii::$app->request->post('start_time');
+        $end_time = yii::$app->request->post('end_time');
+        $id = yii::$app->request->post('id');
+        $result = new ShiftResult();
+        $model = $result->vacationdetails($start_time,$end_time,$id);
+        return $model;
+
+    }
+
+    /**
+     * @SWG\Post(path="/achievements/subunit",
+     *     tags={"云平台-Achievements-绩效管理"},
+     *     summary="组数据",
+     *     description="组数据",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回排班信息"
+     *     ),
+     * )
+     *
+     **/
+    public function actionSubunit(){
+        $customer_id = $this->customerId;
+        $result = new ShiftResult();
+        $model = $result->subunit($customer_id);
+        return $model;
+    }
+
+
+
+
+
+
+}
+

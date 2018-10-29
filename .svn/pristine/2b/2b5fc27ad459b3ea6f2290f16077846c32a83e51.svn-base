@@ -1,0 +1,62 @@
+<?php
+
+namespace common\models\RotaryConfrim;
+
+use Yii;
+use \common\models\rotaryconfrim\base\RotaryConfrim as BaseAttendanceRecord;
+use yii\helpers\ArrayHelper;
+use common\models\employee\Employee;
+use common\models\shift\ShiftResult;
+use common\models\shift\Schedule;
+use common\models\shift\ShiftType;
+use common\models\shift\ShiftTypeDetail;
+
+//ohrm_work_rotary_confrim
+/**
+ * This is the model class for table "ohrm_attendance_record".
+ */
+class RotaryConfrim extends BaseAttendanceRecord
+{
+    public function behaviors()
+    {
+        return ArrayHelper::merge(
+            parent::behaviors(),
+            [
+                # custom behaviors
+            ]
+        );
+    }
+
+    public function rules()
+    {
+        return ArrayHelper::merge(
+            parent::rules(),
+            [
+                # custom validation rules
+            ]
+        );
+    }
+    /*
+     *查询分组下的用户信息
+     */
+    public function getWorkConfrim($id){
+
+        $info = self::find()->select(['hs_hr_employee.*','ohrm_work_rotary_confrim.*'])
+            ->innerjoin('hs_hr_employee', 'hs_hr_employee.emp_number=ohrm_work_rotary_confrim.emp_number')
+            ->where(['ohrm_work_rotary_confrim.rotary_id'=>$id])->asArray()->all();
+        return $info;
+
+
+/*        $query = self::find();
+        $query->where("rotary_id = :rotary_id",[':rotary_id'=>$id]);
+        $list = $query->all();
+        return $list;*/
+    }
+    /*
+     * 删除临时数据
+     * */
+    public function deleteWorkConfrim($id)
+    {
+        self::deleteAll("rotary_id = :rotary_id",[':rotary_id'=>$id]);
+    }
+}

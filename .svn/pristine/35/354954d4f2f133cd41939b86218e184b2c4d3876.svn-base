@@ -1,0 +1,95 @@
+<?php
+
+namespace common\models\performance;
+
+use Yii;
+use \common\models\performance\base\BonusCalculation as BaseBonusCalculation;
+use yii\helpers\ArrayHelper;
+
+/**
+ * This is the model class for table "ohrm_bonus_calculation".
+ */
+class BonusCalculation extends BaseBonusCalculation
+{
+
+    public function behaviors()
+    {
+        return ArrayHelper::merge(
+            parent::behaviors(),
+            [
+                # custom behaviors
+            ]
+        );
+    }
+
+    public function rules()
+    {
+        return ArrayHelper::merge(
+            parent::rules(),
+            [
+                # custom validation rules
+            ]
+        );
+    }
+
+    public function getBonusCalculationBySub($bonusDate,$workStation){
+        $query = self::find();
+        $query->where('bonusDate = :bonusDate',[':bonusDate' => $bonusDate]);
+        $query->andWhere('groupId = :workStation',[':workStation' => $workStation]);
+        
+        $list  = $query->one();
+        return $list;
+    }
+
+    public function getBonusCalculationSearch($search){
+        $subunit = !empty($search['subunit'])?$search['subunit']:null;
+        $status = !empty($search['status'])?$search['status']:null;
+        
+
+        $limit = $search['limit'];   //每页数 20
+        $offset = $search['offset'];   //每页数 20
+
+
+        $query = self::find();
+        if($subunit){
+            if(is_array($subunit)){
+                $query->andWhere(['in','groupId',$subunit]);
+            }else{
+                $query->andWhere('groupId = :subunit',[':subunit'=>$subunit]);
+            }
+        }
+        if($status){
+            if(is_array($status)){
+                $query->andWhere(['in','status',$status]);
+            }else{
+                $query->andWhere('status = :status',[':status'=>$status]);
+            }
+        }
+
+
+        $count = $query->count();
+        $query->orderBy('bonusDate desc');
+
+        $query->offset($offset);
+        $query->limit($limit);
+        $list = $query->all();
+        //$sql=$query ->createCommand()->getRawSql(); 
+        //var_dump($sql);die;   
+
+        return array('list'=>$list,'count'=>$count);
+        
+    }
+
+    public function getListByDate($bonusDate,$customerId){
+        $query = self::find();
+        $query->where('bonusDate = :bonusDate',[':bonusDate' => $bonusDate]);
+        $query->andWhere('customerId = :customerId',[':customerId' => $customerId]);
+        
+        $list  = $query->all();
+        return $list;
+    }
+
+ 
+
+
+}

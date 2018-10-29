@@ -1,0 +1,705 @@
+<?php
+namespace frontend\controllers\v1;
+use common\models\shift\RotationResultTemp;
+use Yii;
+use yii\web\Response;
+use yii\web\Controller;
+//use yii\helpers\ArrayHelper;
+class RotationResultTempController extends \common\rest\Controller
+{
+    /**
+     * @var string
+     */
+    public $modelClass = 'common\models\shift\RotationResultTemp';
+
+    /**
+     *
+     * @var array
+     */
+    public $serializer = [
+        'class' => 'common\rest\Serializer',    // 返回格式数据化字段
+        'collectionEnvelope' => 'result',       // 制定数据字段名称
+        'message' => 'OK',                      // 文本提示
+        'errno'   => 0,
+        'status'  =>'',
+    ];
+    /**
+     * @param  [action] yii\rest\IndexAction
+     * @return [type]
+     */
+    public function beforeAction($action)
+    {
+        $format = \Yii::$app->getRequest()->getQueryParam('format', 'json');
+
+        if($format == 'xml'){
+            \Yii::$app->response->format = \yii\web\Response::FORMAT_XML;
+        }else{
+            \Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+        }
+
+        return $action;
+    }
+
+    /**
+     * @param  [type]
+     * @param  [type]
+     * @return [type]
+     */
+    public function afterAction($action, $result){
+        $result = parent::afterAction($action, $result);
+
+        return $result;
+    }
+
+    public function behaviors()
+    {
+        $behaviors = parent::behaviors();
+        $behaviors['contentNegotiator']['formats']['text/html'] = Response::FORMAT_HTML;
+        return $behaviors;
+    }
+
+    public function actions()
+    {
+        $actions = parent::actions();
+        unset($actions['index']);
+        return $actions;
+    }
+    /**
+     * @SWG\Post(path="/rotation-result-temp/create-version",
+     *     tags={"云平台-rotationResultTemp-轮转中间表"},
+     *     summary="创建轮转计划",
+     *     description="新建轮转计划",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "rotationId",
+     *        description = "轮转表id",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "versionName",
+     *        description = "模板名称",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回班次类型列表"
+     *     ),
+     *     @SWG\Response(
+     *         response = 422,
+     *         description = "Data Validation Failed 创建失败",
+     *     )
+     * )
+     *
+     **/
+    public function actionCreateVersion()
+    {
+        $this->serializer['errno']   = 0;
+        $this->serializer['status']   = true;
+        $this->serializer['message'] = "获取成功";
+    }
+    /**
+     * @SWG\Post(path="/rotation-result-temp/show",
+     *     tags={"云平台-rotationResultTemp-轮转中间表"},
+     *     summary="创建轮转计划",
+     *     description="新建轮转计划",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回班次类型列表"
+     *     ),
+     *     @SWG\Response(
+     *         response = 422,
+     *         description = "Data Validation Failed 创建失败",
+     *     )
+     * )
+     *
+     **/
+    public function actionShow()
+    {
+        /**
+         * 从user表取出人员, 这是开启的规则 从轮转规则表（rotationRule）取出数据
+         */
+
+    }
+    /**
+     * @SWG\Post(path="/rotation-result-temp/publish",
+     *     tags={"云平台-rotationResultTemp-轮转中间表"},
+     *     summary="发布",
+     *     description="发布",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "status",
+     *        description = "确认发布或者调整1,2",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回班次类型列表"
+     *     ),
+     *     @SWG\Response(
+     *         response = 422,
+     *         description = "Data Validation Failed 创建失败",
+     *     )
+     * )
+     *
+     **/
+    //确认发布按钮
+    public function actionPublish()
+    {
+        $a = '[{
+                "label": "确认发布",
+                "status":"1",
+            }
+            ]';
+        $b = json_decode($a);
+        $this->serializer['errno']   = 0;
+        $this->serializer['status']   = true;
+        $this->serializer['message'] = "获取成功";
+        return $b;
+    }
+    /**
+     * @SWG\Post(path="/rotation-result-temp/update",
+     *     tags={"云平台-rotationResultTemp-轮转中间表"},
+     *     summary="显示年月",
+     *     description="显示年月",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回班次类型列表"
+     *     ),
+     *     @SWG\Response(
+     *         response = 422,
+     *         description = "Data Validation Failed 创建失败",
+     *     )
+     * )
+     *
+     **/
+    public function actionUpdate()
+    {
+        $a = '[{
+                "label": "此轮转计划未发布时显示：",
+                "status":1,
+                
+                "name": "2"
+            }
+            ]';
+        $b = json_decode($a);
+        $this->serializer['errno']   = 0;
+        $this->serializer['status']   = true;
+        $this->serializer['message'] = "获取成功";
+        return $b;
+    }
+    /**
+     * @SWG\Post(path="/rotation-result-temp/show-date",
+     *     tags={"云平台-rotationResultTemp-轮转中间表"},
+     *     summary="显示年月",
+     *     description="显示年月",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "rotationId",
+     *        description = "轮转id",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回班次类型列表"
+     *     ),
+     *     @SWG\Response(
+     *         response = 422,
+     *         description = "Data Validation Failed 创建失败",
+     *     )
+     * )
+     *
+     **/
+    //显示年月2019年02月  03月 ... 2020年01月
+    public function actionShowDate()
+    {
+        //status为确认发布或者确认调整,
+        $b = [
+                  'label'=>'此轮转计划未发布时显示',"id"=>"1","status"=>"1","name"=>"2",
+                  'time'=>[
+                        ["label"=>"2019年1月","name"=>"1"],
+                        ["label"=>"07月","name"=>"7"],
+                        ["label"=>"08月","name"=>"8"],
+                        ["label"=>"09月","name"=>"9"],
+                        ["label"=>"10月","name"=>"10"],
+                        ["label"=>"11月","name"=>"11"],
+                        ["label"=>"12月","name"=>"12"],
+                        ["label"=>"2020","name"=>"13"],
+                  ],
+        ];
+        $this->serializer['errno']   = 0;
+        $this->serializer['status']   = true;
+        $this->serializer['message'] = "获取成功";
+        return $b;
+    }
+    /**
+     * @SWG\Post(path="/rotation-result-temp/show-version",
+     *     tags={"云平台-rotationResultTemp-轮转中间表"},
+     *     summary="显示版本表",
+     *     description="显示版本表",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "rotationId",
+     *        description = "轮转表id",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回班次类型列表"
+     *     ),
+     *     @SWG\Response(
+     *         response = 422,
+     *         description = "Data Validation Failed 创建失败",
+     *     )
+     * )
+     *
+     **/
+    //显示轮转版本表（rotationVersion）
+    public function actionShowVersion()
+    {
+        $b = [
+            ["label"=>"默认","value"=>"-1"],
+            ["label"=>"版本3","value"=>"12"],
+            ["label"=>"版本1","value"=>"1"],
+            ["label"=>"版本2","value"=>"2"]
+        ];
+        $this->serializer['errno']   = 0;
+        $this->serializer['status']   = true;
+        $this->serializer['message'] = "获取成功";
+        return $b;
+    }
+    /**
+     * @SWG\Post(path="/rotation-result-temp/show-person",
+     *     tags={"云平台-rotationResultTemp-轮转中间表"},
+     *     summary="显示满足人数",
+     *     description="显示满足人数",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "versionid",
+     *        description = "轮转版本表id",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "rotationId",
+     *        description = "轮转表id",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "rotationDate",
+     *        description = "轮转日期",
+     *        required = true,
+     *        type = "string",
+     *     ),
+     *
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回班次类型列表"
+     *     ),
+     *     @SWG\Response(
+     *         response = 422,
+     *         description = "Data Validation Failed 创建失败",
+     *     )
+     * )
+     *
+     **/
+    public function actionShowPerson()
+    {
+
+        $a = '[{
+                "groupName": "A组",
+                "id": "111",
+                "count": "10",
+                "row": [
+                        [{
+                        "id": "1",
+                        "name": "张三1",
+                        "type": "0",
+                        "isError": false,
+                        "errorInfo": "输出错误信息"
+                    }, {
+                        "id": "2",
+                        "name": "张三2",
+                        "type": "1",
+                        "isError": false,
+                        "errorInfo": ""
+                    }, {
+                        "id": "2",
+                        "name": "张三3",
+                        "type": "2",
+                        "isError": false,
+                        "errorInfo": ""
+                    }],
+                    [{
+                        "id": "1",
+                        "name": "张三4",
+                        "type": "0",
+                        "isError": false,
+                        "errorInfo": ""
+                    }, {
+                        "id": "1",
+                        "name": "张三5",
+                        "type": "1",
+                        "isError": false,
+                        "errorInfo": ""
+                    }, {
+                        "id": "1",
+                        "name": "张三6",
+                        "type": "2",
+                        "isError": false,
+                        "errorInfo": ""
+                    }],
+                    [{
+                        "id": "1",
+                        "name": "张三213",
+                        "type": "0",
+                        "isError": false,
+                        "errorInfo": ""
+                    }, {
+                        "id": "1",
+                        "name": "张三21223",
+                        "type": "1",
+                        "isError": false,
+                        "errorInfo": ""
+                    }, {
+                        "id": "1",
+                        "name": "张三222",
+                        "type": "2",
+                        "isError": false,
+                        "errorInfo": ""
+                    }]
+                ]
+            },
+            {
+                "groupName": "B组",
+                "id": "111",
+                "row": [
+                [{
+                        "id": "1",
+                        "name": "张三21654",
+                        "type": "0",
+                        "isError": false,
+                        "errorInfo": ""
+                    }, {
+                        "id": "1",
+                        "name": "张三78788",
+                        "type": "1",
+                        "isError": false,
+                        "errorInfo": ""
+                    }, {
+                        "id": "1",
+                        "name": "张三1424",
+                        "type": "2",
+                        "isError": false,
+                        "errorInfo": ""
+                    }],
+                    [{
+                        "id": "1",
+                        "name": "张三5757",
+                        "type": "0",
+                        "isError": false,
+                        "errorInfo": ""
+                    }, {
+                        "id": "1",
+                        "name": "张三174",
+                        "type": "1",
+                        "isError": false,
+                        "errorInfo": ""
+                    }, {
+                        "id": "1",
+                        "name": "张三178",
+                        "type": "2",
+                        "isError": false,
+                        "errorInfo": ""
+                    }],
+                    [{
+                        "id": "1",
+                        "name": "张三786",
+                        "type": "0",
+                        "isError": false,
+                        "errorInfo": ""
+                    }, {
+                        "id": "1",
+                        "name": "张三453",
+                        "type": "1",
+                        "isError": false,
+                        "errorInfo": ""
+                    }, {
+                        "id": "1",
+                        "name": "张三123123",
+                        "type": "2",
+                        "isError": false,
+                        "errorInfo": ""
+                    }]
+                ]
+            }, {
+                    "groupName": "C组",
+                    "id": "111",
+                    "row": [
+                        [{
+                        "id": "1",
+                        "name": "张三",
+                        "type": "0",
+                        "isError": false,
+                        "errorInfo": ""
+                    }, {
+                        "id": "1",
+                        "name": "张三",
+                        "type": "1",
+                        "isError": false,
+                        "errorInfo": ""
+                    }, {
+                        "id": "1",
+                        "name": "张三",
+                        "type": "2",
+                        "isError": false,
+                        "errorInfo": ""
+                    }],
+                    [{
+                        "id": "1",
+                        "name": "张三",
+                        "type": "0",
+                        "isError": false,
+                        "errorInfo": ""
+                    }, {
+                        "id": "1",
+                        "name": "张三",
+                        "type": "1",
+                        "isError": false,
+                        "errorInfo": ""
+                    }, {
+                        "id": "1",
+                        "name": "张三",
+                        "type": "2",
+                        "isError": false,
+                        "errorInfo": ""
+                    }],
+                    [{
+                        "id": "1",
+                        "name": "张三",
+                        "type": "0",
+                        "isError": false,
+                        "errorInfo": ""
+                    }, {
+                        "id": "1",
+                        "name": "张三",
+                        "type": "1",
+                        "isError": false,
+                        "errorInfo": ""
+                    }, {
+                        "id": "1",
+                        "name": "张三",
+                        "type": "2",
+                        "isError": false,
+                        "errorInfo": ""
+                    }]
+                ]
+            }]';
+        $b = json_decode($a);
+        $this->serializer['errno']   = 0;
+        $this->serializer['status']   = true;
+        $this->serializer['message'] = "获取成功";
+        return $b;
+
+    }
+    /**
+     * @SWG\Post(path="/rotation-result-temp/show-mutual",
+     *     tags={"云平台-rotationResultTemp-轮转中间表"},
+     *     summary="显示满足人数",
+     *     description="显示满足人数",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "firstgroupid",
+     *        description = "第一个组id",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "secondgroupid",
+     *        description = "第二个组id",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "firstemp",
+     *        description = "第一个员工id",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "secondemp",
+     *        description = "第二个员工id",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "rotationDate",
+     *        description = "时间月份",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "rotationId",
+     *        description = "轮转表id",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回班次类型列表"
+     *     ),
+     *     @SWG\Response(
+     *         response = 422,
+     *         description = "Data Validation Failed 创建失败",
+     *     )
+     * )
+     *
+     **/
+    //数据交互
+    public function actionShowMutual()
+    {
+        $this->serializer['errno']   = 0;
+        $this->serializer['status']   = true;
+        $this->serializer['message'] = "获取成功";
+    }
+    /**
+     * @SWG\Post(path="/rotation-result-temp/del-emp",
+     *     tags={"云平台-rotationResultTemp-轮转中间表"},
+     *     summary="差掉组人员",
+     *     description="显示满足人数",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "firstgroupid",
+     *        description = "第一个组id",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "firstemp",
+     *        description = "第一个员工id",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "rotationDate",
+     *        description = "时间月份",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "rotationId",
+     *        description = "轮转表id",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回班次类型列表"
+     *     ),
+     *     @SWG\Response(
+     *         response = 422,
+     *         description = "Data Validation Failed 创建失败",
+     *     )
+     * )
+     *
+     **/
+    public function actionDelEmp()
+    {
+        $this->serializer['errno']   = 0;
+        $this->serializer['status']   = true;
+        $this->serializer['message'] = "获取成功";
+    }
+}

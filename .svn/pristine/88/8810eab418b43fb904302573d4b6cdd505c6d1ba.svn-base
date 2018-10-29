@@ -1,0 +1,520 @@
+<?php
+
+namespace common\models\healthy;
+
+use common\models\attachment\Attachment;
+use common\models\employee\Employee;
+use common\models\user\User;
+use Yii;
+use \common\models\healthy\base\Healthy as BaseHealthy;
+use yii\helpers\ArrayHelper;
+
+/**
+ * This is the model class for table "hs_hr_emp_healthy".
+ */
+class Healthy extends BaseHealthy
+{
+
+    public function behaviors()
+    {
+        return ArrayHelper::merge(
+            parent::behaviors(),
+            [
+                # custom behaviors
+            ]
+        );
+    }
+
+    public function rules()
+    {
+        return ArrayHelper::merge(
+            parent::rules(),
+            [
+                # custom validation rules
+            ]
+        );
+    }
+
+
+    public function empname($id){
+        $query = (new \yii\db\Query())
+            ->select(['a.emp_firstname','a.emp_number','b.epic_picture_url'])
+            ->from('orangehrm_mysql.hs_hr_employee a')
+            ->leftJoin('orangehrm_mysql.hs_hr_emp_picture b','a.emp_number=b.emp_number')
+            ->where(['a.emp_number'=>$id])
+            ->one();
+        return $query;
+    }
+
+    public function sellist($data){
+        $emp_number = $data['emp_number'];
+        $s_years = isset($data['s_years'])?$data['s_years']:'';
+        $b_years = isset($data['b_years'])?$data['b_years']:'';
+        $healthy_name = isset($data['healthy_name'])?$data['healthy_name']:'';
+        $is_qualified = isset($data['is_qualified'])?$data['is_qualified']:'';
+        $where = '1 = 1';
+        if($emp_number != ''){
+            $where .=" and emp_number = '$emp_number'";
+        }
+        if($s_years != '' && $s_years != 'yyyy-mm-dd' ){
+            $where .=" and healthy_years > '$s_years'";
+        }
+        if($b_years != '' && $b_years != 'yyyy-mm-dd'){
+            $where .=" and healthy_years < '$b_years'";
+        }
+        if($healthy_name != ''){
+            $where .=" and healthy_name = '$healthy_name'";
+        }
+        if($is_qualified != ''){
+            $where .=" and is_qualified = '$is_qualified'";
+        }
+        $query = Healthy::find()->asArray()->where($where)->all();
+        foreach ($query as $k => $v){
+            $query[$k]['img'] = Attachment::find()->asArray()->select(['eattach_filename','eattach_attachment_url'])->where(['emp_number'=>$emp_number,'sort_id'=>$v['id']])->all();
+        }
+        return $query;
+    }
+
+    public function pagenum($data){
+        $emp_number = $data['emp_number'];
+        $s_years = isset($data['s_years'])?$data['s_years']:'';
+        $b_years = isset($data['b_years'])?$data['b_years']:'';
+        $healthy_name = isset($data['healthy_name'])?$data['healthy_name']:'';
+        $is_qualified = isset($data['is_qualified'])?$data['is_qualified']:'';
+        $where = '1 = 1';
+        if($emp_number != ''){
+            $where .=" and emp_number = '$emp_number'";
+        }
+        if($s_years != '' && $s_years != 'yyyy-mm-dd' ){
+            $where .=" and healthy_years > '$s_years'";
+        }
+        if($b_years != '' && $b_years != 'yyyy-mm-dd'){
+            $where .=" and healthy_years < '$b_years'";
+        }
+        if($healthy_name != ''){
+            $where .=" and healthy_name = '$healthy_name'";
+        }
+        if($is_qualified != ''){
+            $where .=" and is_qualified = '$is_qualified'";
+        }
+
+        $pagesize = 10;
+        $num = Healthy::find()->asArray()->where($where)->count();
+
+        return ceil($pagenum = $num/$pagesize);
+    }
+
+    public function listpagenum($data){
+        $emp_name = isset($data['emp_name'])?$data['emp_name']:'';
+        $s_years = isset($data['s_years'])?$data['s_years']:'';
+        $b_years = isset($data['b_years'])?$data['b_years']:'';
+        $healthy_name = isset($data['healthy_name'])?$data['healthy_name']:'';
+        $is_qualified = isset($data['is_qualified'])?$data['is_qualified']:'';
+        if($emp_name != ''){
+            $emp_number = Employee::find()->where(['emp_firstname'=>$emp_name])->one();
+            if ($emp_number == false){
+                $emp_number = -1;
+            }else{
+                $emp_number = $emp_number['emp_number'];
+            }
+        }else{
+            $emp_number='';
+        }
+
+        $where = '1 = 1';
+        if($emp_number != ''){
+            $where .=" and emp_number = '$emp_number'";
+        }
+        if($s_years != '' && $s_years != 'yyyy-mm-dd' ){
+            $where .=" and healthy_years > '$s_years'";
+        }
+        if($b_years != '' && $b_years != 'yyyy-mm-dd'){
+            $where .=" and healthy_years < '$b_years'";
+        }
+        if($healthy_name != ''){
+            $where .=" and healthy_name = '$healthy_name'";
+        }
+        if($is_qualified != ''){
+            $where .=" and is_qualified = '$is_qualified'";
+        }
+
+        $pagesize = 20;
+
+        $num = Healthy::find()->asArray()->where($where)->count();
+
+        return ceil($pagenum = $num/$pagesize);
+    }
+
+
+    public function managementlist($data){
+        $emp_name = isset($data['emp_name'])?$data['emp_name']:'';
+        $s_years = isset($data['s_years'])?$data['s_years']:'';
+        $b_years = isset($data['b_years'])?$data['b_years']:'';
+        $healthy_name = isset($data['healthy_name'])?$data['healthy_name']:'';
+        $is_qualified = isset($data['is_qualified'])?$data['is_qualified']:'';
+        $page = $data['page'];
+        if($emp_name != ''){
+            $emp_number = Employee::find()->asArray()->where(['emp_firstname'=>$emp_name])->one();
+            if ($emp_number == false){
+                $emp_number = -1;
+            }else{
+                $emp_number = $emp_number['emp_number'];
+            }
+        }else{
+            $emp_number='';
+        }
+
+        $where = '1 = 1';
+        if($emp_number != ''){
+            $where .=" and emp_number = '$emp_number'";
+        }
+        if($s_years != '' && $s_years != 'yyyy-mm-dd' ){
+            $where .=" and healthy_years > '$s_years'";
+        }
+        if($b_years != '' && $b_years != 'yyyy-mm-dd'){
+            $where .=" and healthy_years < '$b_years'";
+        }
+        if($healthy_name != ''){
+            $where .=" and healthy_name = '$healthy_name'";
+        }
+        if($is_qualified != ''){
+            $where .=" and is_qualified = '$is_qualified'";
+        }
+
+        $pagesize = 20;
+        $startrow = ($page-1)*$pagesize;
+
+        $query = Healthy::find()->asArray()->where($where)->offset($startrow)->limit($pagesize)->orderBy('emp_number')->all();
+        $count = Healthy::find()->asArray()->where($where)->count();
+
+        if($query != null){
+            foreach ( $query as $key => $row ){
+                $number[$key] = $row ['emp_number'];
+                $years[$key] = $row ['healthy_years'];
+            }
+            array_multisort($number, SORT_ASC, $years, SORT_DESC, $query);
+        }
+
+        $healatta = new HealthyAttached();
+        foreach ($query as $k => $v){
+            $time = explode('-',$v['healthy_years']);
+            $data = $healatta::find()->asArray()->select(['is_all_qualified'])->where(['emp_number'=>$v['emp_number'],'year'=>$time[0]])->one();
+            $query[$k]['is_all_qualified'] = $data['is_all_qualified'];
+            $query[$k]['img'] = Attachment::find()->asArray()->select(['eattach_id','eattach_filename','eattach_attachment_url','eattach_desc'])->where(['emp_number'=>$v['emp_number'],'sort_id'=>$v['id']])->all();
+            $name = Employee::find()->asArray()->select(['emp_firstname'])->where(['emp_number'=>$v['emp_number']])->one();
+            $query[$k]['emp_name'] = $name['emp_firstname'];
+
+            $user = User::find()->asArray()->select(['user_name'])->where(['emp_number'=>$v['emp_number']])->one();
+            $query[$k]['user_name'] = $user['user_name'];
+        }
+        $data['data'] = $query;
+        $data['count'] = (int)$count;
+        $data['pagesize'] = 20;
+        return $data;
+    }
+
+
+    public function healthyadd($data){
+        $emp_number = $data['emp_number'];
+        $healthy_years = $data['healthy_years'];
+        $shift_date=strtotime($healthy_years);
+        $healthy_years=date('Y-m-d',$shift_date);
+        $healthy_name = $data['healthy_name'];
+        $is_qualified = $data['is_qualified'];
+
+        $healthy = new Healthy();
+        $healthy->emp_number = $emp_number;
+        $healthy->healthy_name = $healthy_name;
+        $healthy->healthy_years = $healthy_years;
+        $healthy->is_qualified = $is_qualified;
+        $healthy->create_time = date('Y-m-d H:i:s',time());
+        $query = $healthy->save();
+         if($query){
+             $time = explode('-',$healthy_years);
+             $times = $time[0].'-'.'01'.'-'.'01';
+             $endtimes = $time[0].'-'.'12'.'-'.'12';
+             $where ="emp_number = '$emp_number' and healthy_years >= '$times' and healthy_years <= '$endtimes' and is_qualified = 0";
+             $info = Healthy::find()->where($where)->count();
+             $healatta = new HealthyAttached();
+             $data = $healatta::find()->where(['emp_number'=>$emp_number,'year'=>$time[0]])->one();
+             //return $info;
+             if($data == null && $info == 0){
+                 $healatta->is_all_qualified = 1;
+                 $healatta->emp_number = $emp_number;
+                 $healatta->year = $time[0];
+                 $query = $healatta->save();
+                 return $query;
+             }
+             if($data == null){
+                 $healatta->is_all_qualified = 0;
+                 $healatta->emp_number = $emp_number;
+                 $healatta->year = $time[0];
+                 $query = $healatta->save();
+                 return $query;
+             }
+             $data->is_all_qualified = 0;
+             $data->emp_number = $emp_number;
+             $data->year = $time[0];
+             $query = $data->save();
+             return $query;
+         }else{
+             return $query;
+         }
+    }
+
+    public function healthylistadd($data){
+        $emp_name = $data['emp_name'];
+        $emp = Employee::find()->select(['emp_number'])->where(['emp_firstname'=>$emp_name])->one();
+        if($emp == ''){
+            return false;
+        }
+        $emp_number = $emp['emp_number'];
+        $healthy_years = $data['healthy_years'];
+        $shift_date=strtotime($healthy_years);
+        $healthy_years=date('Y-m-d',$shift_date);
+        $healthy_name = $data['healthy_name'];
+        $is_qualified = $data['is_qualified'];
+
+        $healthy = new Healthy();
+        $healthy->emp_number = $emp_number;
+        $healthy->healthy_name = $healthy_name;
+        $healthy->healthy_years = $healthy_years;
+        $healthy->is_qualified = $is_qualified;
+        $healthy->create_time = date('Y-m-d H:i:s',time());
+        $query = $healthy->save();
+        if($query){
+            $time = explode('-',$healthy_years);
+            $times = $time[0].'-'.'01'.'-'.'01';
+            $endtimes = $time[0].'-'.'12'.'-'.'12';
+            $where ="emp_number = '$emp_number' and healthy_years >= '$times' and healthy_years <= '$endtimes' and is_qualified = 0";
+            $info = Healthy::find()->where($where)->count();
+            $healatta = new HealthyAttached();
+            $data = $healatta::find()->where(['emp_number'=>$emp_number,'year'=>$time[0]])->one();
+            //return $info;
+            if($data == null && $info == 0){
+                $healatta->is_all_qualified = 1;
+                $healatta->emp_number = $emp_number;
+                $healatta->year = $time[0];
+                $query = $healatta->save();
+                return $query;
+            }
+            if($data == null){
+                $healatta->is_all_qualified = 0;
+                $healatta->emp_number = $emp_number;
+                $healatta->year = $time[0];
+                $query = $healatta->save();
+                return $query;
+            }
+                $data->is_all_qualified = 0;
+                $data->emp_number = $emp_number;
+                $data->year = $time[0];
+                $query = $data->save();
+                return $query;
+
+        }else{
+            return $query;
+        }
+    }
+
+
+    public function healthydel($id){
+        $healthy = new Healthy();
+        $info = $healthy::deleteAll(['id'=>$id]);
+        if($info){
+            $attachment = new Attachment();
+            $info = $attachment::find()->where(['sort_id'=>$id])->one();
+            if ($info){
+                foreach ($id as $k=>$v){
+                    $url = $attachment::find()->select(['eattach_attachment_url'])->where(['sort_id'=>$v,'screen'=>'healthy'])->one();
+                    if($url != ''){
+                        $delurl = '/data/wwwroot/uploadfile/'.$url['eattach_attachment_url'];
+                        unlink($delurl);
+                    }
+
+                }
+                $query = $attachment::deleteAll(['sort_id'=>$id]);
+                return $query;
+            }
+
+        }else{
+            return $info;
+        }
+    }
+
+    public function attachmentdel($emp_number,$id){
+        $attachment = new Attachment();
+        foreach ($id as $k=>$v){
+            $url = $attachment::find()->select(['eattach_attachment_url'])->where(['eattach_id'=>$v,'emp_number'=>$emp_number])->one();
+            if($url != ''){
+                unlink($url['eattach_attachment_url']);
+            }
+        }
+        $query = $attachment::deleteAll(['eattach_id'=>$id,'emp_number'=>$emp_number]);
+        return $query;
+    }
+
+    public function attachmentlistdel($emp_number,$id){
+        foreach ($id as $k=>$v){
+            $arr[$k]['id'] = $v;
+            $arr[$k]['emp_number'] = $emp_number[$k];
+        }
+        $attachment = new Attachment();
+        foreach ($arr as $k=>$v){
+            $url = $attachment::find()->select(['eattach_attachment_url'])->where(['eattach_id'=>$v['id'],'emp_number'=>$v['emp_number']])->one();
+            if($url != ''){
+                unlink($url['eattach_attachment_url']);
+            }
+            $query = $attachment::deleteAll(['eattach_id'=>$v['id'],'emp_number'=>$v['emp_number']]);
+        }
+
+        return $query;
+    }
+
+
+
+
+
+
+
+
+    public function emphealthy($emp_number){
+        $query = Healthy::find()->asArray()->select(['id','healthy_name','healthy_years'])->where(['emp_number'=>$emp_number])->orderBy('healthy_years DESC')->all();
+
+        foreach ($query as $k => $v){
+            $arr[$k]['id'] = $v['id'];
+            $arr[$k]['name'] = $v['healthy_name'].'_'.$v['healthy_years'];
+        }
+        return $arr;
+    }
+
+
+    public function healthylist_healthy($emp_name){
+        $emp = Employee::find()->select(['emp_number'])->where(['emp_firstname'=>$emp_name])->one();
+        if ($emp == ''){
+            return false;
+        }
+        $emp_number = $emp['emp_number'];
+        $query = Healthy::find()->asArray()->select(['id','healthy_name','healthy_years'])->where(['emp_number'=>$emp_number])->orderBy('healthy_years DESC')->all();
+        foreach ($query as $k => $v){
+            $arr[$k]['id'] = $v['id'];
+            $arr[$k]['name'] = $v['healthy_name'].'_'.$v['healthy_years'];
+        }
+        return $arr;
+    }
+
+    public function healthyattachment($emp_number,$healthy_id){
+        $query = Attachment::find()->select('*')->where(['emp_number'=>$emp_number,'screen'=>'healthy','sort_id'=>$healthy_id])->all();
+        return $query;
+    }
+
+    public function healthylistattachment($healthy='healthy'){
+        $query = Attachment::find()->asArray()->select('*')->where(['screen'=>$healthy])->all();
+        foreach ($query as $k=>$v){
+            $hea = Healthy::find()->asArray()->select(['healthy_name','healthy_years'])->where(['id'=>$v['healthy_id']])->one();
+            $query[$k]['healthy_name'] = $hea['healthy_name'].'_'.$hea['healthy_years'];
+            $emp = Employee::find()->select(['emp_firstname'])->where(['emp_number'=>$v['emp_number']])->one();
+            $query[$k]['emp_name'] = $emp['emp_firstname'];
+        }
+        return $query;
+
+    }
+
+    public function emphealthsel($healthy_id){
+        $query = (new \yii\db\Query())
+            ->select(['a.*','b.emp_firstname'])
+            ->from('orangehrm_mysql.hs_hr_emp_healthy a')
+            ->leftJoin('orangehrm_mysql.hs_hr_employee b','a.emp_number=b.emp_number')
+            ->where(['a.id'=>$healthy_id])
+            ->one();
+        return $query;
+    }
+
+    public function emphealthyupdate($data){
+        $id = $data['healthy_id'];
+        $healthy_name = $data['healthy_name'];
+        $healthy_years = $data['healthy_years'];
+        $shift_date=strtotime($healthy_years);
+        $healthy_years=date('Y-m-d',$shift_date);
+        $is_qualified = $data['is_qualified'];
+
+
+        $hea = Healthy::find()->where(['id'=>$id])->one();
+        $hea->healthy_name = $healthy_name;
+        $hea->healthy_years = $healthy_years;
+        $hea->is_qualified = $is_qualified;
+        $query = $hea->save();
+        $emp_number = $hea['emp_number'];
+        if($query){
+            $time = explode('-',$healthy_years);
+            $times = $time[0].'-'.'01'.'-'.'01';
+            $endtimes = $time[0].'-'.'12'.'-'.'12';
+            $where ="emp_number = '$emp_number' and healthy_years >= '$times' and healthy_years <= '$endtimes' and is_qualified = 0";
+            $info = Healthy::find()->where($where)->count();
+            $healatta = new HealthyAttached();
+            $data = $healatta::find()->where(['emp_number'=>$emp_number,'year'=>$time[0]])->one();
+
+            if($info == 0){
+                    $data->is_all_qualified = 1;
+                    $query = $data->save();
+                    return $query;
+            }else{
+                    $data->is_all_qualified = 0;
+                    $query = $data->save();
+                    return $query;
+            }
+
+        }else{
+            return false;
+        }
+    }
+
+    public function updatedessc($data){
+        $emp_number = $data['emp_number'];
+        $desc = $data['desc'];
+        $eattach_id = $data['eattach_id'];
+        $attachment = new Attachment();
+        $atta = $attachment::find()->where(['emp_number'=>$emp_number,'eattach_id'=>$eattach_id])->one();
+        $atta->eattach_desc = $desc;
+        $query = $atta->save();
+        return $query;
+
+    }
+
+    public function selexcel(){
+        $query = Healthy::find()->asArray()->orderBy('emp_number')->all();
+        if($query != null){
+            foreach ( $query as $key => $row ){
+                $number[$key] = $row ['emp_number'];
+                $years[$key] = $row ['healthy_years'];
+            }
+            array_multisort($number, SORT_ASC, $years, SORT_DESC, $query);
+        }
+
+
+        $healatta = new HealthyAttached();
+        foreach ($query as $k => $v){
+            if($v['is_qualified'] == '1'){
+                $is_qualified = '合格';
+            }else{
+                $is_qualified = '不合格';
+            }
+            $time = explode('-',$v['healthy_years']);
+            $data = $healatta::find()->select(['is_all_qualified'])->where(['emp_number'=>$v['emp_number'],'year'=>$time[0]])->one();
+            if($data['is_all_qualified'] == '1'){
+                $is_all_qualified = '合格';
+            }else{
+                $is_all_qualified = '不合格';
+            }
+            $query[$k]['is_qualified'] = $is_qualified;
+            $query[$k]['is_all_qualified'] = $is_all_qualified;
+            //$query[$k]['img'] = Attachment::find()->asArray()->select(['eattach_filename','eattach_attachment_url'])->where(['emp_number'=>$v['emp_number'],'sort_id'=>$v['id']])->all();
+            $name = Employee::find()->select(['emp_firstname'])->where(['emp_number'=>$v['emp_number']])->one();
+            $query[$k]['emp_name'] = $name['emp_firstname'];
+            $user = User::find()->asArray()->select(['user_name'])->where(['emp_number'=>$v['emp_number']])->one();
+            $query[$k]['user_name'] = $user['user_name'];
+        }
+        return $query;
+    }
+
+
+}

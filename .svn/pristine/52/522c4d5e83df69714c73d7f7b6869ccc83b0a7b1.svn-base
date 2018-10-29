@@ -1,0 +1,86 @@
+<?php
+
+namespace common\models\shift;
+
+use Yii;
+use \common\models\shift\base\RotationResultTemp as BaseRotationResultTemp;
+use yii\helpers\ArrayHelper;
+
+/**
+ * This is the model class for table "ohrm_rotationResultTemp".
+ */
+class RotationResultTemp extends BaseRotationResultTemp
+{
+
+    public function behaviors()
+    {
+        return ArrayHelper::merge(
+            parent::behaviors(),
+            [
+                # custom behaviors
+            ]
+        );
+    }
+
+    public function rules()
+    {
+        return ArrayHelper::merge(
+            parent::rules(),
+            [
+                # custom validation rules
+            ]
+        );
+    }
+
+    /**
+     * @param $usersPrepareIn
+     * @param $firstemp
+     * @return mixed
+     */
+    public function unsetArray($usersPrepareIn,$firstemp)
+    {
+        if(!empty($usersPrepareIn)){
+            foreach ($usersPrepareIn as $key=>$emp)
+            {
+                if($firstemp == $emp['userId']){
+                    if(count($usersPrepareIn) == 1){
+                        unset($usersPrepareIn);
+                    }else{
+                        unset($usersPrepareIn[$key]);
+                    }
+                }
+            }
+        }
+        return $usersPrepareIn;
+    }
+    public function getRotationResultTempOne($rotationId,$rotationDate,$groupId)
+    {
+        $data = self::find()
+            ->where(['rotationId'=>$rotationId,'rotationDate'=>$rotationDate,'groupId'=>$groupId])
+            ->asArray()
+            ->one();
+        return $data;
+    }
+    public function getRotationResultTempOb($rotationId,$rotationDate,$groupId)
+    {
+        $data = self::find()
+            ->where(['rotationId'=>$rotationId,'rotationDate'=>$rotationDate,'groupId'=>$groupId])
+            ->one();
+        return $data;
+    }
+    public function getRotationResultTemp($rotationId,$rotationDate)
+    {
+        $data = self::find()
+            ->where(['rotationId'=>$rotationId,'rotationDate'=>$rotationDate])
+            ->asArray()
+            ->all();
+        return $data;
+    }
+    public function getRotationResultTempList($rotationId,$rotationDate)
+    {
+        $data = self::find()
+            ->where(['rotationId'=>$rotationId,'rotationDate'=>$rotationDate])
+            ->all();
+        return $data;
+    }
+}

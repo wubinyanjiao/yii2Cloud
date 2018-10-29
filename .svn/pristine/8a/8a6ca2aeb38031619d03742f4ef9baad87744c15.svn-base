@@ -1,0 +1,338 @@
+<?php
+namespace frontend\controllers\v1;
+use common\models\shift\RotationList;
+use Yii;
+use yii\web\Response;
+use yii\web\Controller;
+//use yii\helpers\ArrayHelper;
+class RotationListController extends \common\rest\Controller
+{
+    /**
+     * @var string
+     */
+    public $modelClass = 'common\models\shift\RotationList';
+
+    /**
+     *
+     * @var array
+     */
+    public $serializer = [
+        'class' => 'common\rest\Serializer',    // 返回格式数据化字段
+        'collectionEnvelope' => 'result',       // 制定数据字段名称
+        'message' => 'OK',                      // 文本提示
+        'errno'   => 0,
+        'status'  =>'',
+    ];
+    /**
+     * @param  [action] yii\rest\IndexAction
+     * @return [type]
+     */
+    public function beforeAction($action)
+    {
+        $format = \Yii::$app->getRequest()->getQueryParam('format', 'json');
+
+        if($format == 'xml'){
+            \Yii::$app->response->format = \yii\web\Response::FORMAT_XML;
+        }else{
+            \Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+        }
+
+        return $action;
+    }
+
+    /**
+     * @param  [type]
+     * @param  [type]
+     * @return [type]
+     */
+    public function afterAction($action, $result){
+        $result = parent::afterAction($action, $result);
+
+        return $result;
+    }
+
+    public function behaviors()
+    {
+        $behaviors = parent::behaviors();
+        $behaviors['contentNegotiator']['formats']['text/html'] = Response::FORMAT_HTML;
+        return $behaviors;
+    }
+
+    public function actions()
+    {
+        $actions = parent::actions();
+        unset($actions['index']);
+        return $actions;
+    }
+    /**
+     * @SWG\Post(path="/rotation-list/create",
+     *     tags={"云平台-rotationList-轮转接口"},
+     *     summary="创建轮转计划",
+     *     description="新建轮转计划",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "rotationName",
+     *        description = "轮转名称",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "rotationDateBegin",
+     *        description = "起始日期",
+     *        required = true,
+     *        type = "string",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "rotationDateEnd",
+     *        description = "截止日期",
+     *        required = true,
+     *        type = "string",
+     *        default = 0,
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "status",
+     *        description = "状态：0默认1已发布2已删除",
+     *        required = false,
+     *        type = "integer",
+     *        default = 0,
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "groupInfo",
+     *        description = "相关所有组信息，格式json",
+     *        required = false,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "createTime",
+     *        description = "创建时间",
+     *        required = false,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "editTime",
+     *        description = "最后修改时间",
+     *        required = false,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回班次类型列表"
+     *     ),
+     *     @SWG\Response(
+     *         response = 422,
+     *         description = "Data Validation Failed 创建失败",
+     *     )
+     * )
+     *
+     **/
+    public function actionCreate()
+    {
+
+
+        /*$a = [
+            'errno'=>0,
+            'message'=>'获取成功',
+            'status'=>true,
+            "result"=>
+            ["id"=>"1",
+                    "rotationName"=>"2018年计划",
+                    "rotationDateBegin"=>"2018-09-11 至 2019-9-11",
+                    "status"=>"已发布",
+                    "groupInfo"=>"商务组 拿药组"],
+
+
+        ];
+        $this->serializer['errno']   = 0;
+        $this->serializer['status']   = true;
+        $this->serializer['message'] = "添加成功";*/
+        //return [];
+        /**
+        $post = Yii::$app->request->post();
+        $isLeader = $this->isLeader;
+        if(!$isLeader){
+            $this->serializer['errno']   = '422';
+            $this->serializer['status']   = false;
+            $this->serializer['message'] = '权限不够，只有组长及副组长权限可以';
+            return [];
+        }
+
+        $rotationList = new RotationList;
+        $week = get_week($post['rotationDateBegin']);
+        $bb = date('d',strtotime($post['rotationDateBegin']));
+
+        $cc = $week-1;
+
+        if($week>1){
+            $aa = date('Y-m-d',strtotime('-3 day',strtotime($post['rotationDateBegin'])));
+            var_dump($aa);exit;
+
+        }*/
+
+    }
+    /**
+     * @SWG\Post(path="/rotation-list/list",
+     *     tags={"云平台-rotationList-轮转接口"},
+     *     summary="获取某个约束",
+     *     description="获取小组约束",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "rotationRuleWarehouseId",
+     *        description = "规则类型：空默认out调出规则in调入规则",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回技能类型列表"
+     *     ),
+     * )
+     *
+     **/
+    public function actionList()
+    {
+        $a = [
+            'errno'=>0,
+            'message'=>'获取成功',
+            'status'=>true,
+            "result"=>[
+                ["id"=>"1",
+                "rotationName"=>"2018年计划",
+                "rotationDateBegin"=>"2018-09-11 至 2019-9-11",
+                "status"=>"已发布",
+                "groupInfo"=>""],
+                ["id"=>"2",
+                    "rotationName"=>"2000年计划",
+                    "rotationDateBegin"=>"2018-09-11 至 2019-9-11",
+                    "status"=>"默认",
+                    "groupInfo"=>"商务组 拿药组 扫地组"],
+            ],
+        ];
+
+        echo json_encode($a,JSON_UNESCAPED_UNICODE);exit;
+        if(count($a)>0){
+
+            $this->serializer['errno']   = 0;
+            $this->serializer['status']   = true;
+            $this->serializer['message'] = "获取成功";
+            return $a;
+        }else{
+            $this->serializer['errno']   = 2000060000;
+            $this->serializer['status']   = false;
+            $this->serializer['message'] = "获取失败";
+        }
+
+        //var_dump($list);exit;
+       // select id,rotationName,rotationDateBegin...from rotationList;
+    }
+    /**
+     * @SWG\Post(path="/rotation-list/list-one",
+     *     tags={"云平台-rotationList-轮转接口"},
+     *     summary="获取某个约束",
+     *     description="获取小组约束",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "id",
+     *        description = "轮转表id",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回技能类型列表"
+     *     ),
+     * )
+     *
+     **/
+    public function actionListOne()
+    {
+        $a = [
+            'errno'=>0,
+            'message'=>'获取成功',
+            'status'=>true,
+            "result"=>
+                [
+                    "rotationId"=>"1",//轮转表id
+                    "rotationName"=>"2018年计划",
+                    "rotationDateBegin"=>"2018-09-11 至 2019-9-11",
+                    "groupInfo"=>[
+                        ["groupId"=>"1","groupName"=>"商务组"],
+                        ["groupId"=>"2","groupName"=>"拿药组"],
+                        ["groupId"=>"3","groupName"=>"扫地组"],
+                    ],
+                    "ruleInfo"=>[
+                        ["ruleId"=>"out","groupName"=>"调出规则"],
+                        ["ruleId"=>"in","groupName"=>"调入规则 "],
+                        ],
+                ],
+        ];
+
+        echo json_encode($a,JSON_UNESCAPED_UNICODE);exit;
+    }
+    /**
+     * @SWG\Post(path="/rotation-list/del",
+     *     tags={"云平台-rotationList-轮转接口"},
+     *     summary="获取某个约束",
+     *     description="获取小组约束",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "id",
+     *        description = "id种子",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回技能类型列表"
+     *     ),
+     * )
+     *
+     **/
+    public function actionDel()
+    {
+
+        $a = [
+            'errno'=>0,
+            'message'=>'删除成功',
+            'status'=>true];
+        echo json_encode($a,JSON_UNESCAPED_UNICODE);exit;
+      //  delete from rotationList where id in(1,2...)and status !=1;//判断是否为已发布的,如果是不能删除;
+    }
+}

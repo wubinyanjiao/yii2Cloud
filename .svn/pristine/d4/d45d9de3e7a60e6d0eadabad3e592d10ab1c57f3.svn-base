@@ -1,0 +1,570 @@
+<?php
+
+namespace common\models\performance;
+
+use Yii;
+use \common\models\performance\base\BonusCalculationManage as BaseBonusCalculationManage;
+use yii\helpers\ArrayHelper;
+use \common\models\performance\BonusCalculation;
+use \common\models\performance\BonusCalculationList;
+use \common\models\performance\BonusCalculationManageList;
+use \common\models\subunit\Subunit;
+use \common\models\user\User;
+
+use \common\models\employee\Employee;
+
+
+/**
+ * This is the model class for table "ohrm_bonus_calculation_manage".
+ */
+class BonusCalculationManage extends BaseBonusCalculationManage
+{
+
+    public function behaviors()
+    {
+        return ArrayHelper::merge(
+            parent::behaviors(),
+            [
+                # custom behaviors
+            ]
+        );
+    }
+
+    public function rules()
+    {
+        return ArrayHelper::merge(
+            parent::rules(),
+            [
+                # custom validation rules
+            ]
+        );
+    }
+
+    public function getBonusCalculationManageSearch($search){
+        $subunit = !empty($search['subunit'])?$search['subunit']:null;
+        $status = !empty($search['status'])?$search['status']:null;
+        $year = !empty($search['year'])?$search['year']:null;
+        $customerId = $search['customerId'];
+
+        $limit = $search['limit'];   //每页数 20
+        $offset = $search['offset'];   //每页数 20
+
+
+        $query = self::find();
+        $query->where('customerId = :customerId',[':customerId'=>$customerId]);
+        if($subunit){
+            if(is_array($subunit)){
+                $query->andWhere(['in','groupId',$subunit]);
+            }else{
+                $query->andWhere('groupId = :groupId',[':groupId'=>$groupId]);
+            }
+        }
+        if($status){
+            if(is_array($status)){
+                $query->andWhere(['in','status',$status]);
+            }else{
+                $query->andWhere('status = :status',[':status'=>$status]);
+            }
+        }
+        if($year){
+            if(is_array($year)){
+                $query->andWhere(['in','bonusDate',$year]);
+            }else{
+                $query->andWhere('bonusDate = :bonusDate',[':bonusDate'=>$year]);
+            }
+        }
+
+        $count = $query->count();
+        $query->orderBy('bonusDate desc');
+
+        $query->offset($offset);
+        $query->limit($limit);
+        $list = $query->all();
+        //$sql=$query ->createCommand()->getRawSql(); 
+        //var_dump($sql);die;   
+
+        return array('list'=>$list,'count'=>$count);
+        
+    }
+    public function getBonusCalculationManage($customerId = null,$date = null,$groupId = null){
+        $query = self::find();
+        if($customerId){
+            $query->andWhere('customerId = :customerId',[':customerId' => $customerId]);
+        }
+        if($date){
+            $query->andWhere('bonusDate = :date',[':date' => $date]);
+        }
+        if($groupId){
+            $query->andWhere('groupId = :groupId',[':groupId' => $groupId]);
+        }
+        
+        $list  = $query->one();
+        return $list;
+    }
+    public function getBonusCalculationManageById($id ){
+        $query = self::find();
+        
+        $query->andWhere('id = :id',[':id' => $id]);
+        
+        $list  = $query->one();
+        return $list;
+    }
+    public function getBonusCalculationManageBySub($date,$workStation){
+        $query = self::find();
+        $query->where('bonusDate = :date',[':date' => $date]);
+        $query->andWhere('groupId = :workStation',[':workStation' => $workStation]);
+        
+        $list  = $query->one();
+        return $list;
+    }
+
+    /**
+     * 生成在线excel
+     * @param  [type] $bonusDate  [description]
+     * @param  [type] $customerId [description]
+     * @param  [type] $header     [description]
+     * @return [type]             [description]
+     */
+    public function saveExcelByManange($bonusDate,$customerId,$header){
+        $BonusCalculation = new BonusCalculation();
+        $BonusCalculationList = new BonusCalculationList();
+
+
+        $data = $BonusCalculation->getListByDate($bonusDate,$customerId);
+
+        foreach ($data as $key => $value) {
+            $saveList = array();
+            $list = $BonusCalculationList->getCalculationListByCaId($value->id,$value->groupId);
+            
+            //$saveList[0] = array('0'=>$bonusDate.' '.$value->subunit->name);
+            $saveList[0] = $header;
+            foreach ($list as $k => $v) {
+                $saveList[] = json_decode($v->sheetInfo);
+            }
+
+            $s = down_file_by_excel($saveList,'','excel');
+            $d= OverwriteWithExcel($s,$value->sheetName);
+            //@unlink($s);
+        }
+
+
+    } 
+
+
+    public function getContentByDate($id,$groupId,$topGroupId,$bonusDate,$statusName){
+        if($groupId==$topGroupId){
+
+             $query = BonusCalculationManageList::find();
+             
+        }else{
+            $query = BonusCalculationList::find();
+            $query->andWhere('groupId = :groupId',[':groupId'=>$groupId]);
+        }
+        $query->select('count(*) as count,sum(percent20) as percent20,sum(percent80) as percent80');
+        $query->andWhere('bonusDate = :bonusDate',[':bonusDate'=>$bonusDate]);
+        $list = $query->asArray()->one();
+
+        $Subunit = new Subunit();
+        $sub = $Subunit->getWorkStationById($groupId);
+        $backArr = array();
+        if(empty($list['count'])){
+            return $backArr;
+        }
+        $backArr[]= array('title'=>'奖金日期','val'=>date('Y年m月',strtotime($bonusDate))) ;
+        $backArr[]= array('title'=>'组名','val'=>$sub->name) ;
+        $backArr[]= array('title'=>'人数','val'=>$list['count']) ;
+        $backArr[]= array('title'=>'基本工资','val'=>$list['percent20']) ;
+        $backArr[]= array('title'=>'除20%外合计','val'=>$list['percent80']) ;
+        $backArr[]= array('title'=>'状态','val'=>$statusName) ;
+        return $backArr;
+        
+    }  
+
+    public function xiaoduiContentByDate($id,$groupId,$topGroupId,$bonusDate){
+        $query = BonusCalculationManageList::find();
+        $query->select('count(*) as count,sum(percent20) as percent20,sum(percent80) as percent80');
+
+        $query1 = BonusCalculationList::find();
+        $query1->select('count(*) as count,sum(percent20) as percent20,sum(percent80) as percent80');
+        if($groupId!=$topGroupId){
+            $query1->andWhere('groupId = :groupId',[':groupId'=>$groupId]);
+            $query->andWhere('groupId = :groupId',[':groupId'=>$groupId]);
+        }
+        $query->andWhere('bonusDate = :bonusDate',[':bonusDate'=>$bonusDate]);
+        $query1->andWhere('bonusDate = :bonusDate',[':bonusDate'=>$bonusDate]);
+        $list = $query->asArray()->one();
+
+        $list1 = $query1->asArray()->one();
+        $Subunit = new Subunit();
+        $sub = $Subunit->getWorkStationById($groupId);
+
+        $header[] = array('title'=>'组名','key'=>'subName','align'=>'center');
+        $header[] = array('title'=>'人数(下发)','key'=>'peopleConut','align'=>'center');
+        $header[] = array('title'=>'基本工资(下发)','key'=>'percent20','align'=>'center');
+        $header[] = array('title'=>'除20%外合计(下发)','key'=>'percent80','align'=>'center');
+        
+        $header[] = array('title'=>'人数(上报)','key'=>'peopleConutSh','align'=>'center');
+        $header[] = array('title'=>'基本工资(上报)','key'=>'percent20Sh','align'=>'center');
+        $header[] = array('title'=>'除20%外合计(上报)','key'=>'percent80Sh','align'=>'center');
+        $header[] = array('title'=>'校验结果','key'=>'checkout','align'=>'center');
+
+
+        $jiao = 0 ;
+        if($list['count']!=$list1['count']){
+            $jiao = 1;
+        }
+        if($list['percent20']!=$list1['percent20']){
+            $jiao = 1;
+        }
+        if($list['percent80']!=$list1['percent80']){
+            $jiao = 1;
+        }
+
+        $backArr[0]['subName'] = $sub->name;
+        $backArr[0]['peopleConut'] = $list['count'];
+        $backArr[0]['percent20'] = $list['percent20'];
+        $backArr[0]['percent80'] = $list['percent80'];
+        $backArr[0]['peopleConutSh'] = $list1['count'];
+        $backArr[0]['percent20Sh'] = $list1['percent20'];
+        $backArr[0]['percent80Sh'] = $list1['percent80'];
+        $backArr[0]['checkout'] = $jiao;
+
+
+
+        return array('header'=>$header,'content'=>$backArr);
+
+    }
+    
+    public function huiContentByDate($id,$groupId,$topGroupId,$bonusDate){
+        $query = BonusCalculationManageList::find();
+        $query->select('count(*) as count,sum(percent20) as percent20,sum(percent80) as percent80,groupId');
+        $query->andWhere('bonusDate = :bonusDate',[':bonusDate'=>$bonusDate]);
+
+        $query->groupby('groupId');
+        $list = $query->asArray()->all();
+
+
+        foreach ($list as $key => $value) {
+            
+        }
+
+        $header[] = array('title'=>'组名','key'=>'subName','align'=>'center');
+        $header[] = array('title'=>'人数','key'=>'peopleConut','align'=>'center');
+        $header[] = array('title'=>'基本工资','key'=>'percent20','align'=>'center');
+        $header[] = array('title'=>'除20%外合计','key'=>'percent80','align'=>'center');
+
+        $backHeader = array();
+        $backEnd = array();
+        $backArr = array();
+
+        $peopleConut = 0;
+        $percent20 = 0;
+        $percent80 = 0;
+        $i = 0 ;
+        $Subunit = new Subunit();
+        foreach ($list as $key => $value) {
+            $sub = $Subunit->getWorkStationById($value['groupId']);
+            $arr['subName'] = $sub->name;
+            $arr['peopleConut'] = $value['count'];
+            $arr['percent20'] = $value['percent20'];
+            $arr['percent80'] = $value['percent80'];
+            $arr['id'] = $sub->id;
+            $arr['bonusDate'] = $bonusDate;
+
+            $peopleConut += $value['count'];
+            $percent20 += $value['percent20'];
+            $percent80 += $value['percent80'];
+
+            $backArr[] = $arr;
+
+            $i++;
+        }
+        $backEnd['subName'] = '合计';
+        $backEnd['peopleConut'] = $peopleConut;
+        $backEnd['percent20'] = $percent20;
+        $backEnd['percent80'] = $percent80;
+        $backEnd['id'] = 0;
+        $backEnd['bonusDate'] =$bonusDate;
+
+        array_push($backArr,$backEnd);
+
+        return array('header'=>$header,'content'=>$backArr);
+    }
+
+    public function getBonusCalculationManageListBySub($groupId,$bonusDate,$customerId){
+        $query = BonusCalculationManageList::find();
+        $Subunit = new Subunit();
+        $User = new User();
+        if($groupId){
+            $sub = $Subunit->getWorkStationById($groupId);
+            $query->andWhere('groupId = :groupId',[':groupId'=>$groupId]);
+            $subArr[$sub->id] = $sub->name;
+        }else{
+            $sub = $Subunit->getAllWorkStation($customerId);
+
+            foreach ($sub as $key => $value) {
+                $subArr[$value->id] = $value->name;
+            }
+        }
+
+        $query->andWhere('bonusDate = :bonusDate',[':bonusDate'=>$bonusDate]);
+        $query->andWhere('customerId = :customerId',[':customerId'=>$customerId]);
+
+        $query->orderBy('groupId');
+        $list = $query->asArray()->all();   
+        $peopleConut = 0;
+        $percent20 = 0;
+        $percent80 = 0;
+        $i = 1;
+        $backArr = array();
+        foreach ($list as $key => $value) {
+            $user = $User->getSystemUsersByEmpNumber($value['emp_number']);
+
+            $arr['serNumber'] = $i;            
+            $arr['subName'] = $subArr[$value['groupId']];
+            $arr['wagNumber'] = $user->user_name;
+            $arr['percent20'] = $value['percent20'];
+            $arr['percent80'] = $value['percent80'];
+
+            $peopleConut += 1;
+            $percent20 += $value['percent20'];
+            $percent80 += $value['percent80'];
+
+            $backArr[] = $arr;
+            $i++;
+        }
+        $header[] = array('title'=>'序号','key'=>'serNumber','align'=>'center');
+        $header[] = array('title'=>'组名','key'=>'subName','align'=>'center');
+        $header[] = array('title'=>'工资号','key'=>'wagNumber','align'=>'center');
+        $header[] = array('title'=>'基本工资','key'=>'percent20','align'=>'center');
+        $header[] = array('title'=>'除20%外合计','key'=>'percent80','align'=>'center');
+        
+        $backEnd['serNumber'] = '合计';
+        $backEnd['subName'] = '';
+        $backEnd['wagNumber'] = $peopleConut;
+        $backEnd['percent20'] = $percent20;
+        $backEnd['percent80'] = $percent80;
+        
+
+        array_push($backArr,$backEnd);
+
+        return array('header'=>$header,'content'=>$backArr);
+    }
+    
+
+    public function deleteBonusCalculationManageListBySub($groupId,$date){
+        $query = new BonusCalculationManageList();
+        $recod = $query->deleteAll(['groupId' =>$groupId,'bonusDate'=>$date]);
+        return $recod;
+    }
+    public function deleteBonusCalculationListBySub($groupId,$date){
+        $query = new BonusCalculationList();
+        $recod = $query->deleteAll(['groupId' =>$groupId,'bonusDate'=>$date]);
+        return $recod;
+    }
+
+    /**
+     * 查找不是顶级组的所有状态为1的
+     */
+    public function getManageByStatus($bonusDate,$status,$topGroupId,$customerId){
+        $query = BonusCalculationManage::find();
+
+        $query->andWhere('bonusDate = :bonusDate',[':bonusDate'=>$bonusDate]);
+        $query->andWhere('status != :status',[':status'=>$status]);
+        $query->andWhere('groupId != :groupId',[':groupId'=>$topGroupId]);
+        $query->andWhere('customerId = :customerId',[':customerId'=>$customerId]);
+        $list = $query->one();  
+
+        return $list;
+    }
+
+    public function updateBonusCalculationManageById($id,$groupId,$bonusDate,$status){
+        $query = new BonusCalculationManage();
+        $recod = $query->updateAll(array('status'=>$status),'bonusDate =:bonusDate AND groupId=:groupId',array(':bonusDate'=>$bonusDate,':groupId'=>$groupId));
+
+        $query1 = new BonusCalculationManageList();
+        $recod1 = $query1->updateAll(array('status'=>$status),'bonusDate =:bonusDate AND groupId=:groupId',array(':bonusDate'=>$bonusDate,':groupId'=>$groupId));
+    }
+    public function getBonusCalculationManageByDescDate($customerId){
+        $query = BonusCalculationManage::find();
+
+        $query->where('customerId = :customerId',[':customerId'=>$customerId]);
+        $query->orderBy('bonusDate desc');
+        $list = $query->one();
+
+        return $list;
+        
+    }
+
+    public function getBonusCalculationManageByMaxDate($customerId){
+        $query = BonusCalculationManage::find();
+        $query->select('max(bonusDate) as bonusDate');
+        $query->where('customerId = :customerId',[':customerId'=>$customerId]);
+        $query->orderBy('bonusDate desc');
+        $list = $query->asArray()->one();
+
+        return $list;
+        
+    }
+
+    public function verificationExcel($url,$customerId){
+        $response = getCURLByExcel($url,1,'PUT');
+        $response = json_decode($response);
+
+        if($response){
+            if(count($response)<2){
+                return array('status'=>false,'message'=>'你还没上传excel文件');
+            }
+
+            $Subunit = new Subunit();
+            $Employee = new Employee();
+            $User  = new User();
+            $BonusCalculationManageConfig = new BonusCalculationManageConfig();
+            $sub = $Subunit->getSubunitByCustomerId($customerId,1);
+            $groupId = $sub->id;
+            $data = $BonusCalculationManageConfig->getBonusByCustId($groupId,$customerId);
+
+            if($data){
+                $BonusCalculationManageConfig = $data;
+
+                $userField = $BonusCalculationManageConfig->userField;
+                $checkingField = $BonusCalculationManageConfig->checkingField;
+                $userGroup = $BonusCalculationManageConfig->userGroup;
+
+                if($userField){
+                    $userFieldArr = json_decode($userField);    
+                    $gongzihao = $userFieldArr->sheetName;
+                }else{
+                    $gongzihao = '工资号';
+                }
+
+                if($checkingField){
+                    $checkingFieldArr = json_decode($checkingField);
+                    $arr = array();
+                    $percent20 = $checkingFieldArr[0]->sheetName;
+                    $percent80 = $checkingFieldArr[1]->sheetName;
+                    $zu = $checkingFieldArr[2]->sheetName;
+                }else{
+                    $percent20 = '基本绩效工资';
+                    $percent80 = '除20%外合计';
+                    $zu = '组别';
+                }
+
+            }else{
+                $gongzihao = '工资号';
+                $percent20 = '基本绩效工资';
+                $percent80 = '除20%外合计';
+                $zu = '组别';
+                $GroupArr = array();
+            }
+            
+            $arr = array();
+            $header = $response['0'];
+
+            if(!in_array($gongzihao,$header)){
+                // $this->serializer['status'] = false;
+                // $this->serializer['errno'] = 2;
+                // $this->serializer['message'] = '奖金配置工资号列验证不成功';
+                return array('status'=>false,'message'=>'奖金配置工资号列验证不成功');
+            }
+            if(!in_array($percent20,$header)){
+                // $this->serializer['status'] = false;
+                // $this->serializer['errno'] = 2;
+                // $this->serializer['message'] = '奖金配置基本工资列验证不成功';
+                return array('status'=>false,'message'=>'奖金配置基本工资列验证不成功');
+               
+            }
+            if(!in_array($percent80,$header)){
+                // $this->serializer['status'] = false;
+                // $this->serializer['errno'] = 2;
+                // $this->serializer['message'] = '奖金配置除20%外合计列验证不成功';
+                return array('status'=>false,'message'=>'奖金配置除20%外合计列验证不成功');
+            }
+
+            $backArr['gongzihao'] = $gongzihao;
+            $backArr['percent20'] = $percent20;
+            $backArr['percent80'] = $percent80;
+            $backArr['zu'] = $zu;
+            return array('status'=>true,'message'=>'获取数据成功','response'=>$response,'back'=>$backArr);
+
+        }else{
+            return array('status'=>false,'message'=>'获取数据失败');
+        }
+    }
+
+    /**
+     *  验证数组是否有设置的列名
+     * @param  [type] $response   [description]
+     * @param  [type] $customerId [description]
+     * @return [type]             [description]
+     */
+    public function verificationExcelList($response,$customerId){
+        if($response){
+            if(count($response)<2){
+                return array('status'=>false,'message'=>'你上传excel文件缺少内容');
+            }
+
+            $Subunit = new Subunit();
+            $Employee = new Employee();
+            $User  = new User();
+            $BonusCalculationManageConfig = new BonusCalculationManageConfig();
+            $sub = $Subunit->getSubunitByCustomerId($customerId,1);
+            $groupId = $sub->id;
+            $data = $BonusCalculationManageConfig->getBonusByCustId($groupId,$customerId);
+
+            if($data){
+                $BonusCalculationManageConfig = $data;
+
+                $userField = $BonusCalculationManageConfig->userField;
+                $checkingField = $BonusCalculationManageConfig->checkingField;
+                $userGroup = $BonusCalculationManageConfig->userGroup;
+
+                if($userField){
+                    $userFieldArr = json_decode($userField);    
+                    $gongzihao = trim($userFieldArr->sheetName);
+                }else{
+                    $gongzihao = '工资号';
+                }
+
+                if($checkingField){
+                    $checkingFieldArr = json_decode($checkingField);
+                    $arr = array();
+                    $percent20 = trim($checkingFieldArr[0]->sheetName);
+                    $percent80 = trim($checkingFieldArr[1]->sheetName);
+                }else{
+                    $percent20 = '基本绩效工资';
+                    $percent80 = '除20%外合计';
+                }
+            }else{
+                $gongzihao = '工资号';
+                $percent20 = '基本绩效工资';
+                $percent80 = '除20%外合计';
+            }
+            
+            $arr = array();
+            $header = array();
+            foreach ($response as $key => $value) {
+                $header[$key] = trim($value);
+            }
+            if(!in_array($gongzihao,$header)){
+                return array('status'=>false,'message'=>'奖金配置工资号列验证不成功');
+            }
+            if(!in_array($percent20,$header)){
+                return array('status'=>false,'message'=>'奖金配置基本工资列验证不成功');
+               
+            }
+            if(!in_array($percent80,$header)){
+                return array('status'=>false,'message'=>'奖金配置除20%外合计列验证不成功');
+            }
+
+            $backArr['gongzihao'] = $gongzihao;
+            $backArr['percent20'] = $percent20;
+            $backArr['percent80'] = $percent80;
+            return array('status'=>true,'message'=>'获取数据成功','back'=>$backArr);
+        }else{
+            return array('status'=>false,'message'=>'获取数据失败');
+        }
+    }
+
+   
+}

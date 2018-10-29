@@ -1,0 +1,201 @@
+<?php
+
+namespace common\models\shift;
+
+use Yii;
+use \common\models\shift\base\ShiftType as BaseShiftType;
+use yii\helpers\ArrayHelper;
+
+/**
+ * This is the model class for table "ohrm_work_shift_type".
+ */
+class ShiftType extends BaseShiftType
+{
+    const IS_SHIFT_HALF = 1;//半天班
+    const IS_SHIFT_HALF_NO = 0;//全天班
+
+    const IS_SHIFT_NIGHT = 1;//夜班
+
+    
+    public function behaviors()
+    {
+        return ArrayHelper::merge(
+            parent::behaviors(),
+            [
+                # custom behaviors
+            ]
+        );
+    }
+
+    public function rules()
+    {
+        return ArrayHelper::merge(
+            parent::rules(),
+            [
+                # custom validation rules
+            ]
+        );
+    }
+
+    public function addShifType($data){
+
+       $data['ShiftType']['create_at']=date('Y-m-d',time());
+
+        if ($this->load($data) && $this->save()) {
+            return true;
+        }
+        return false;
+    }
+
+    public function getShifType($location_id){
+        $query = self::find()
+        ->where('status > 0');
+        if(is_array($location_id)){
+             $query->andWhere(['in','location_id',$location_id]);
+        }else{
+            $query ->andWhere('location_id = :location_id', [':location_id' => $location_id]);
+        }
+        
+
+        $data=$query->orderBy('id desc')->asArray()->all();
+
+        return $data;
+    }
+
+
+    /**
+     * @author 吴斌  2018/1/11 修改 
+     * 获取夜班信息
+     * @param int $location_id 组id
+     * @param int $page 页码
+     * @param int $pageSize 每页显示多少条数据
+     * @return Array | 对象
+     */
+    public function getNightType($location_id){
+        $data = self::find()
+        ->where('status > 0')
+        ->andWhere(['location_id' => $location_id,'is_night_shift'=>'1'])
+        ->one();
+        return $data;
+    }
+
+    
+
+     /**
+     * @author 吴斌  2018/1/11 修改 
+     * 查找组下类型
+     * @param int $location_id 组id
+     * @param int $page 页码
+     * @param int $pageSize 每页显示多少条数据
+     * @return Array | 对象
+     */
+
+
+    public function getShifTypeByPage($location_id,$page=null,$pageSize=null){
+        $query = self::find()
+        ->where('location_id = :location_id', [':location_id' => $location_id]);
+
+        $count=$query->count();
+        $data['totalCount']=$count;
+        $startrow = ($page-1)*$pageSize;
+        $data['data']=$query->offset($startrow)->limit($pageSize)->asArray()->all();
+        return $data;
+    }
+
+    public function getShifTypeById($type_id){
+        $shiftTypeList = self::find()->where('id = :type_id', [':type_id' => $type_id])->asArray()->one();
+
+        return $shiftTypeList;
+    }
+
+    /**
+     * @author 吴斌  2018/1/11 修改 
+     * 判断班次类型所包含的时间段
+     * @param int $location_id 组id
+     * @param int $page 页码
+     * @param int $pageSize 每页显示多少条数据
+     * @return Array | 对象
+     */
+    public function getShifTypeTimeAreaById($type_id){
+        $shiftType= self::find()->where('id = :type_id', [':type_id' => $type_id])->asArray()->one();
+        if(($shiftType['start_time']!='00:00:00'&&!empty($shiftType['start_time']))|| ($shiftType['end_time_afternoon']!='00:00:00'&&!empty($shiftType['end_time_afternoon']))){
+            $confimone['frist_type_id']=$type_id;
+        }else{
+            $confimone['frist_type_id']='';
+        }
+        if(($shiftType['start_time_afternoon']!='00:00:00'&&!empty($shiftType['start_time_afternoon']))|| ($shiftType['end_time']!='00:00:00'&&!empty($shiftType['end_time']))){
+            $confimone['second_type_id']=$type_id;
+        }else{
+             $confimone['second_type_id']='';
+        }
+
+        if(($shiftType['time_start_third']!='00:00:00'&&!empty($shiftType['time_start_third']))|| ($shiftType['time_end_third']!='00:00:00'&&!empty($shiftType['time_end_third']))){
+            $confimone['third_type_id']=$type_id;
+        }else{
+            $confimone['third_type_id']='';
+        }
+
+        return $confimone;
+    }
+
+    
+
+    public function updateType($data){
+        $typeid=(int)$data['id'];
+        $data['create_at']=date('Y-m-d',time());
+        $name=$data['name'];
+        $start_time=$data['start_time'];
+        $end_time=$data['end_time'];
+        $is_grant=$data['is_grant'];
+        $is_night_shift=$data['is_night_shift'];
+        $is_amont_work=$data['is_amont_work'];
+        $require_employee=$data['require_employee'];
+        $week_select=$data['week_select'];
+        $start_time_afternoon=$data['start_time_afternoon'];
+        $end_time_afternoon=$data['end_time_afternoon'];
+        $color=$data['color'];
+        $status=$data['status'];
+        $is_work_overtime=$data['is_work_overtime'];
+        $is_work_half=$data['is_work_half'];
+        $clock_in=$data['clock_in'];
+        $is_daka_half=$data['is_daka_half'];
+        $remark=$data['remark'];
+        $is_approval=$data['is_approval'];
+        $duty_factor=$data['duty_factor'];
+        $skill_list=$data['skill_id'];
+        $time_start_third=$data['time_start_third'];
+        $time_end_third=$data['time_end_third'];
+        $typeEntity['ShiftType']=$data;
+
+
+        if ($this->load($typeEntity) && $this->validate()) {
+            return (bool)$this->updateAll([
+                'name' => $name,
+                'start_time' => $start_time,
+                'end_time' => $end_time,
+                'require_employee' => $require_employee,
+                'is_grant' => $is_grant,
+                'is_night_shift' => $is_night_shift,
+                'duty_factor' => $duty_factor,
+                'is_amont_work' => $is_amont_work,
+                'week_select' => $week_select,
+                'start_time_afternoon' => $start_time_afternoon,
+                'end_time_afternoon' => $end_time_afternoon,
+                'is_work_overtime' => $is_work_overtime,
+                'is_work_half' => $is_work_half,
+                'clock_in' => $clock_in,
+                'is_daka_half' => $is_daka_half,
+                'remark' => $remark,
+                'is_approval' => $is_approval,
+                'skill_id' => $skill_list,
+                'color' => $color,
+                'status' => $status,
+                'time_start_third' => $time_start_third,
+                'time_end_third' => $time_end_third
+            ], 'id = :id', [':id' => $typeid]);
+        }
+        
+    }
+
+    
+}

@@ -1,0 +1,363 @@
+<?php
+
+namespace common\models\shift;
+
+use Yii;
+use \common\models\shift\base\Schedule as BaseSchedule;
+use yii\helpers\ArrayHelper;
+use common\models\shift\ShiftOrderBy;
+use common\models\shift\ShiftResult;
+use common\models\shift\ShiftResultOrange;
+use common\models\shift\ShiftResultConfirm;
+use common\models\shift\ShiftDate;
+use common\models\shift\ShiftType;
+use common\models\shift\EmpSkill;
+use common\models\shift\ShiftTypeDetail;
+use common\models\employee\Employee;
+use common\models\leave\LeaveEntitlement;
+
+/**
+ * This is the model class for table "ohrm_work_schedule".
+ */
+class Schedule extends BaseSchedule
+{
+    const IS_INSERT= 1;//结果插入成功
+    const IS_INSERT_NO = 0;//结果未插入
+    const IS_INSERT_FALSE = 2;//结果插入失败
+
+
+    const SCHEUDLE_STATUS= 0;//草稿状态
+    const SCHEUDLE_STATUS_SUCESS = 1;//引擎执行成功
+    const SCHEUDLE_STATUS_FALSE = 2;//引擎执行失败
+    const SCHEUDLE_STATUS_ON = 3;//引擎正在排班
+
+
+    public function behaviors()
+    {
+        return ArrayHelper::merge(
+            parent::behaviors(),
+            [
+                # custom behaviors
+            ]
+        );
+    }
+
+    public function rules()
+    {
+        return ArrayHelper::merge(
+            parent::rules(),
+            [
+                # custom validation rules
+            ]
+        );
+    }
+
+    public function addSchedule($data)
+    {
+        
+        $data['Schedule']['create_at']=date('Y-m-d',time());
+
+        if($data['Schedule']['copy_type']==1){
+            $data['Schedule']['copy_type']='one';
+        }else if($data['Schedule']['copy_type']==2){
+            $data['Schedule']['copy_type']='two';
+        }
+        if ($this->load($data) && $this->save()) {
+            return true;
+        }
+        return false;
+    }
+
+    public function getSchedule($work_station){
+        $scheduleList = self::find()->select('id,name')->where(' is_confirm > 0 and is_show >0 and location_id = :work_station', [':work_station' => $work_station])->orderBy('id desc')->all();
+        return $scheduleList;
+    }
+
+    /**
+     * @author 吴斌  2018/7/19 修改 
+     * 获取计划
+     * @param array $id 计划id
+     * @return array | 班次计划
+     */
+
+
+    public function getScheduleById($id){
+        $scheduleList = self::find()->where('id = :id', [':id' => $id])->one();
+        return $scheduleList;
+    }
+
+
+    public function getScheduleListArr($work_station){
+        $scheduleList = self::find()->select('id,name')->where(' is_confirm > 0 and is_show >0 and location_id = :work_station', [':work_station' => $work_station])->orderBy('id desc')->asArray()->all();
+        return $scheduleList;
+    }
+
+
+    /**
+     * @author 吴斌  2018/7/19 修改 
+     * 获取计划
+     * @param array $work_station 所属小组 
+     * @param array $start_date 开始日期
+     * @param array $end_date 结束日期 
+     * @param array $page 页码
+     * @param array $pageSize 每页显示个数
+     * @return array | 日期
+     */
+
+
+    public function getScheduleList($work_station,$page,$pageSize,$start_date,$end_date,$name,$is_leader=false){
+        $query = self::find()->where(' is_show > 0 and location_id = :work_station', [':work_station' => $work_station]);
+
+        if(!$is_leader){//如果不是组长
+            $query ->andWhere('is_confirm > 0');
+        }
+     
+
+        if (isset($start_date)&&!empty($start_date)) {
+           $query ->andWhere(['>','shift_date',$start_date]);
+        }
+        if (isset($end_date)&&!empty($end_date)) {
+           $query ->andWhere(['<','shift_date',$end_date]);
+        }
+
+        
+        if (isset($name)&&!empty($name)) {
+           $query ->andWhere(['like', 'name', $name]);
+        } 
+        $count=$query->count();
+       
+        $data['totalCount']=(int)$count;
+        $data['pageSize']=(int)$pageSize;
+        $data['current_page']=(int)$page;
+        $startrow = ($page-1)*$pageSize;
+        $data['data']=$query->offset($startrow)->limit($pageSize)->orderBy('id DESC')->asArray()->all();
+
+
+        return $data;
+    }
+
+
+    /**
+     * @author 吴斌  2018/4/3 修改 
+     * 循环排班结果
+     * @param int $id 计划ID
+     * @param int $emps 员工编号员工组
+     * @param int $shift_dates 日期组
+     * @param int $result_type 排班表结果类型
+     * @return array $date_format   规范化数组 
+     */
+    public function rollShiftResult($schedule_id,$emps,$shift_dates,$result_type){
+
+        $confirmmodel=new ShiftResultConfirm;
+        $shiftordermodel=new ShiftOrderBy;
+        $employeemodel=new Employee;
+        $roll_sort=0;
+
+        
+        $assignment_list=$confirmmodel->getShiftResultByContions($schedule_id,$emps,$shift_dates);
+        $emp_news=$shiftordermodel->getShiftOrderBy($schedule_id);
+
+        $emp_new=array_column($emp_news, 'emp_number');
+        if(count($emp_new)>0){
+            $employ_list=$emp_new;
+        }else{
+            $employeeList=$employeemodel->group($work_station);
+            $employ_list=array_column($employeeList,'emp_number');
+        }
+        $employ_list=array_unique($employ_list);
+        $employ_list_assignment=array_column($assignment_list,'emp_number');
+        $employ_list_assignment=array_unique($employ_list_assignment);
+    
+        //参与循环的顺序替换
+        $employee_array=array();
+        foreach ($emps as $key => $employee) {
+            if(in_array($employee, $employ_list_assignment)){
+                foreach ($assignment_list as $k => $assignment) {
+                    if($assignment['emp_number']==$employee){
+                        $employee_array[$employee][]=$assignment;
+                    }
+                }
+            }else{
+                $employee_array[$employee][]='';
+            }
+
+            if(in_array($employee, $emp_new)){
+                 foreach ($emp_news as $k => $orderIndex) {
+                    if($orderIndex['emp_number']==$employee){
+                        $orderByEmp[$employee][]=$orderIndex;
+                    }
+                 }
+            }
+        }
+
+
+        $arr_keys=array_keys($employee_array);
+        $order_keys=array_keys($orderByEmp); 
+
+        //循环排序
+        if($roll_sort==0){
+            array_unshift($arr_keys, array_pop($arr_keys));
+            array_unshift($order_keys, array_pop($order_keys));
+        }else{
+            array_push($arr_keys, array_shift($arr_keys));
+            array_push($order_keys, array_shift($order_keys));
+        }
+
+        $array_ab=array_combine($arr_keys,$employee_array);
+        $order_ab=array_combine($order_keys,$orderByEmp);
+
+        //存储交换的排班结果
+        if(count($array_ab)>0){
+            foreach ($array_ab as $key => $new_result) {
+                foreach ($new_result as $k => $v) {
+                    if(null!=$v){
+                        $shiftconfirmodel=new ShiftResultConfirm;
+                        if(!$shiftconfirmodel->updateResultEmp($v['id'],$key)){
+                            throw new \Exception();
+                        }
+                    }
+                }
+            }
+        }
+
+
+    }
+    
+
+    /**
+     * @author 吴斌  2018/4/3 修改 
+     * 将排班结果插入到表中
+     * @param int $scheduleID 计划ID
+     * @param int $work_station 小组id
+     * @return array $date_format   规范化数组 
+     */
+    public function shiftResultInsert($scheduleID,$work_station){
+
+        $transaction = Yii::$app->db->beginTransaction();
+        $schedule=Schedule::find()->where('id =:schedule_id ',[':schedule_id'=>$scheduleID])->one();
+
+        $scheduleID =$schedule->id;
+        $schedule_status=$schedule->status;
+        $is_insert=$schedule->is_insert;
+        if($schedule_status==1 && $is_insert==0){//排班已经完成
+            $if_have_insert=array();
+            $confirmmodel=new ShiftResultConfirm;
+            Schedule::updateAll(['is_insert'=>1],['id'=>$scheduleID]);
+            try{
+                //删除已经存在模板计划
+                ShiftResultConfirm::deleteAll(['schedule_id'=>$scheduleID]);
+                $shiftdatemodel=new ShiftDate;
+                $typemodel=new ShiftType;
+                $employmodel=new Employee;
+                //获取solve文件
+                $path=Yii::getAlias('@base');
+                $base_path=dirname($path).'/optaplannerxml/';
+                $last=substr($scheduleID, -1);
+                $xml_path=$base_path.'xml_'.$last.'/roster_'.$scheduleID.'_solved.xml';
+                $emp_new=array();
+                $emp_all=array();
+
+                //获取schedule的日期
+                $shiftDateListEntity=$shiftdatemodel->getDatesBySchedule($scheduleID);
+                $shiftDateList=array_column($shiftDateListEntity, 'shift_date');
+                $shiftTypeList=$typemodel->getShifType($work_station);
+                $shiftTypeList = array_column($shiftTypeList, NULL, 'id');
+
+                //获取改组所有员工
+                //如果有模板数据，则顺序去模板数据员工数据
+                $orderbymodel=new ShiftOrderBy;
+                $ordernow=array();
+                $ordernow=$orderbymodel->getShiftOrderBy($scheduleID);
+
+                $workStationEmp=$employmodel->getEmpByWorkStation($work_station);
+                $emp_all=array_column($workStationEmp, 'emp_number'); 
+ 
+                $arr='';
+                $arr = file_get_contents($xml_path);
+                $result=xmlToArray($arr);  
+                $shift_on_emp=array_unique(array_column($result['Assignment'], 'Employee'));
+                foreach ($emp_all as $key => $employee) {
+                    if(in_array($employee, $shift_on_emp)){
+                        foreach ($result['Assignment'] as $k => $assignment) {
+                            if($assignment['Employee']==$employee){
+                                $employee_array[$employee][]=$assignment;
+                            }
+                        }
+                    }else{
+                        $employee_array[$employee][]='';
+                    }
+                }
+
+                foreach ($result['Assignment'] as $key => $assignment) {
+                    if(in_array($assignment['Date'], $shiftDateList)){
+                        //判断是不是半天班
+                        $is_half=$shiftTypeList[$assignment['ShiftType']]['is_work_half'];
+                        if($is_half==0){//全天
+                            $rest_type=0;
+                        }else{
+                            $rest_type=2;
+                        }
+                        $confirmmodel=new ShiftResultConfirm;
+
+                        $data['ShiftResultConfirm']['schedule_id']= $scheduleID;
+                        $data['ShiftResultConfirm']['emp_number']= $assignment['Employee'];
+                        $data['ShiftResultConfirm']['shift_type_id']= $assignment['ShiftType'];
+                        $data['ShiftResultConfirm']['shift_date']= $assignment['Date'];
+                        $data['ShiftResultConfirm']['shift_type_name']= '';
+                        $data['ShiftResultConfirm']['leave_type']= 0;
+                        $data['ShiftResultConfirm']['rest_type']= $rest_type;
+                        if(!$confirmmodel->addConfrim($data)){
+                            throw new \Exception();
+                        }
+                    }
+                }
+
+
+                if(count($ordernow)==0){//如果没有存储过员工顺序
+                    //存储排序
+                    foreach ($emp_all as $key_index => $value_index) {
+                        $orderbymodel=new ShiftOrderBy;
+                        $orderdata['ShiftOrderBy']['emp_number']=$value_index;
+                        $orderdata['ShiftOrderBy']['work_station']=$work_station;
+                        $orderdata['ShiftOrderBy']['shift_index']=$key_index;
+                        $orderdata['ShiftOrderBy']['schedule_id']=$scheduleID;
+             
+                        if(!$orderbymodel->addShiftOrder($orderdata)){
+                                throw new \Exception();
+                        }
+                    }
+                }
+                
+                foreach ($employee_array as $key => $employee) {
+                    $employ_day=array_column($employee,'Date');
+                    $employ_day=array_unique($employ_day);
+                    //该员工哪几天不上班
+                    $diff=array_diff($shiftDateList, $employ_day);
+                    if(!empty($diff)){
+                        foreach ($diff as $difkey=> $difday) {
+                            $confirmmodel=new ShiftResultConfirm;
+                            $data2['ShiftResultConfirm']['schedule_id']      = $scheduleID;
+                            $data2['ShiftResultConfirm']['emp_number']       = $key;
+                            $data2['ShiftResultConfirm']['shift_type_id']    = 0;
+                            $data2['ShiftResultConfirm']['shift_date']       = $difday;
+                            $data2['ShiftResultConfirm']['shift_type_name']  = '';
+                            $data2['ShiftResultConfirm']['leave_type']       = 0;
+                            $data2['ShiftResultConfirm']['rest_type']        = 1;
+                            if(!$confirmmodel->addConfrim($data2)){
+                                throw new \Exception();
+                            }
+                        }
+                    }
+                }
+
+                $transaction->commit();
+                return true;
+
+            }catch(\Exception $e) {
+                $transaction->rollback();
+                return false;
+            }
+
+        }
+    }
+}

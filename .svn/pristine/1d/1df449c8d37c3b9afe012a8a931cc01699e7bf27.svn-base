@@ -1,0 +1,146 @@
+<?php
+
+namespace common\models\shift;
+
+use Yii;
+use \common\models\shift\base\RotationRule as BaseRotationRule;
+use yii\helpers\ArrayHelper;
+
+/**
+ * This is the model class for table "ohrm_rotationRule".
+ */
+class RotationRule extends BaseRotationRule
+{
+
+    public function behaviors()
+    {
+        return ArrayHelper::merge(
+            parent::behaviors(),
+            [
+                # custom behaviors
+            ]
+        );
+    }
+
+    public function rules()
+    {
+        return ArrayHelper::merge(
+            parent::rules(),
+            [
+                # custom validation rules
+            ]
+        );
+    }
+    public function getRuleAll($rotationId,$groupId,$ruleType)
+    {
+        $data = self::find()
+            ->where(['rotationId'=>$rotationId,'groupId'=>$groupId,'ruleType'=>$ruleType])
+            ->asArray()
+            ->all();
+        return $data;
+    }
+    public function checkRule($ruleAll)
+    {
+        //调出规则
+        foreach ($ruleAll as $k=>$v){
+            switch ($v['rotationRuleWarehouseId']){
+                case 1:
+                    $select1 = json_decode($v['select1']);
+                    $input1 = json_decode($v['input1']);
+//                    $rule = [];
+                    foreach ($select1 as $key=>$val){
+//                        $rule[$val[0]] = $input1[$key];
+                        RotationEmployee::updateAll(['isDel'=>2],['and',['!=','title_id',$val[0]],['>','emp_gender',$input1[$key]]]);
+                    }
+                    RotationEmployee::updateAll(['isDel'=>2],['!=','title_id',4]);
+                    break;
+                case 2:
+//                    RotationEmployee::updateAll(['isDel'=>2],['in','is_leader',['1','2']]);
+                    break;
+                case 3:
+                    /*$select1 = json_decode($v['select1']);
+                    $work_time = $select1[0][0]*12;
+                    RotationEmployee::updateAll(['isDel'=>2],['<','work_time',$work_time]);*/
+                    break;
+                case 4:
+                    /*$select1 = json_decode($v['select1']);
+                    $emp_gender = $select1[0][0];
+                    RotationEmployee::updateAll(['isDel'=>2],['!=','emp_gender',$emp_gender]);*/
+                    break;
+                case 5:
+                    //将二维数组转换为以为数组
+                    /*$select2 = json_decode($v['select2']);
+                    var_dump($select2);
+                    $result = array_reduce($select2, 'array_merge', array());
+                    RotationEmployee::updateAll(['isDel'=>2],['not in','record_id',$result]);*/
+                    break;
+                case 6:
+                    /*$input1 = json_decode($v['input1']);
+                    $input1 = $input1[0];
+                    $input1 = date('Y-m-d',strtotime("-$input1 year",time()));
+                    $input2 = json_decode($v['input2']);
+                    $input2 = $input2[0];
+                    $input2 = date('Y-m-d',strtotime("-$input2 year",time()));
+                    RotationEmployee::updateAll(['isDel'=>2],['not between','emp_birthday',$input1,$input2]);*/
+                    break;
+            }
+        }
+
+        //调入规则
+        foreach ($ruleAll as $k1=>$v1){
+            switch ($v1['rotationRuleWarehouseId']){
+                case 7:
+                    /*$select1 = json_decode($v1['select1']);
+                    $result = array_reduce($select1, 'array_merge', array());
+                    $title_id = 2;
+                    if($title_id<min($result)){
+                        $this->serializer['errno'] = 0;
+                        $this->serializer['status'] = false;
+                        $this->serializer['message'] = "职称等级不符合";
+                        return[];
+                    }*/
+                    break;
+                case 8:
+                    /*$select1 = json_decode($v1['select1']);
+                    $result = array_reduce($select1, 'array_merge', array());
+                    $emp_gender = 1;
+                    if(!in_array($emp_gender,$result)){
+                        $this->serializer['errno'] = 0;
+                        $this->serializer['status'] = false;
+                        $this->serializer['message'] = "性别不匹配";
+                        return[];
+                    }*/
+                    break;
+                case 9:
+                    /*$select1 = json_decode($v1['select1']);
+                    $result = array_reduce($select1, 'array_merge', array());
+                    $record_id = 2;
+                    if($record_id<min($result)){
+                        $this->serializer['errno'] = 0;
+                        $this->serializer['status'] = false;
+                        $this->serializer['message'] = "学历不匹配";
+                        return[];
+                    }*/
+                    break;
+                case 10:
+                    /*$emp_birthday = '1951-04-12';
+                    $input1 = json_decode($v1['input1']);
+                    $input2 = json_decode($v1['input2']);
+                    $age = getAge($emp_birthday);
+                    if($age<$input1[0] || $age>$input2[0]){
+                        $this->serializer['errno'] = 0;
+                        $this->serializer['status'] = false;
+                        $this->serializer['message'] = "年龄不匹配";
+                        return[];
+                    }*/
+                    break;
+                case 11:
+                    $mutual_exclusion = 678;
+                    if($mutual_exclusion){
+
+                    }
+                    break;
+            }
+        }
+    }
+}

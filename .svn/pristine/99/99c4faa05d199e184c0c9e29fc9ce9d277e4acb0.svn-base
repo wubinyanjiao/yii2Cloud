@@ -1,0 +1,1545 @@
+<?php
+
+namespace frontend\controllers\v1;
+
+/**
+* 权限模块
+*/
+use yii;
+use yii\web\Response;
+
+use yii\captcha\CaptchaAction;
+use yii\filters\AccessControl;
+use yii\helpers\ArrayHelper;
+use yii\rest\OptionsAction;
+
+use common\models\user\User;
+use common\models\user\UserRole;
+use common\models\subunit\Subunit;
+use common\models\employee\Employee;
+use common\models\performance\PerformanceParam;
+use common\models\performance\BonusCalculationManageConfig;
+use common\models\performance\BonusCalculationManage;
+use common\models\performance\BonusCalculationManageList;
+use common\models\performance\BonusCalculation;
+use common\models\performance\BonusCalculationList;
+
+use common\models\leave\LeaveEntitlement;
+
+
+
+use cheatsheet\Time;
+
+
+class PerformanceController extends \common\rest\Controller
+{
+    public $stat_date = null;
+    public $end_date = null;
+
+    /**
+     * @var array
+     */
+    public $serializer = [
+        'class'              => 'common\rest\Serializer',
+        'collectionEnvelope' => 'result',
+        'errno'              => 0,
+        'message'            => 'OK',
+    ];
+
+    /**
+     * @param  [action] yii\rest\IndexAction
+     * @return [type] 
+     */
+    public function beforeAction($action)
+    {
+       
+        $format = \Yii::$app->getRequest()->getQueryParam('format', 'json');
+
+        if($format == 'xml'){
+            \Yii::$app->response->format = \yii\web\Response::FORMAT_XML;
+        }else{
+            \Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+        }
+
+        // 移除access行为，参数为空全部移除
+        // Yii::$app->controller->detachBehavior('access');
+        return $action;
+    }
+    /**
+    * @inheritdoc
+    */
+    public function behaviors()
+    {
+        return ArrayHelper::merge(
+            parent::behaviors(),
+            [
+                'access' => [
+                    'class' => AccessControl::className(),
+                    'rules' => [[
+                        'allow' => true,
+                        'matchCallback' => function ($rule, $action) {
+                            // return true;
+                            // var_dump($this->module->id . '_' . $this->id . '_' . $action->id); exit();
+                            return \Yii::$app->user->can(
+                                $this->module->id . '_' . $this->id . '_' . $action->id, 
+                                ['route' => true]
+                            );
+                        },
+                    ]]
+                ]
+            ]
+        );
+    }
+    /**
+     * @SWG\Post(path="/performance/get-search-list",
+     *     tags={"云平台-Performance-绩效"},
+     *     summary="获取奖金管理-查询条件",
+     *     description="用户登录：成功返回用户信息；失败返回具体原因",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "token",
+     *        required = false,
+     *        type = "string"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "status",
+     *        description = "状态 1有默认值 0无默认值",
+     *        required = false,
+     *        type = "string"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "status_one",
+     *        description = "是否显示年份栏 1是",
+     *        required = false,
+     *        type = "string"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "status_two",
+     *        description = "是否显示月份栏 1是",
+     *        required = false,
+     *        type = "string"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "status_three",
+     *        description = "是否显示状态栏 1是",
+     *        required = false,
+     *        type = "string"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "status_four",
+     *        description = "是否显示类型 1是",
+     *        required = false,
+     *        type = "string"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "status_five",
+     *        description = "是否显示组 1是",
+     *        required = false,
+     *        type = "string"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "登陆成功，返回用户信息"
+     *     ),
+     *     @SWG\Response(
+     *         response = 422,
+     *         description = "Data Validation Failed ",
+     *     )
+     * )
+     *
+     */
+    public function actionGetSearchList(){
+        $status = Yii::$app->request->post('status'); 
+        $status_one = Yii::$app->request->post('status_one'); 
+        $status_two = Yii::$app->request->post('status_two'); 
+        $status_three = Yii::$app->request->post('status_three'); 
+        $status_four = Yii::$app->request->post('status_four'); 
+        $status_five = Yii::$app->request->post('status_five'); 
+
+        $params = Yii::$app->params;
+        $date = getDiffYearAndMonth();
+        $PerformanceParam = new PerformanceParam();
+
+        $userId = $this->userId;
+        //$userId = 723;
+
+        $check_year = array();
+        $check_month = array();
+        $check_type = array();
+        $check_status = array();
+        $check_subunit = array();
+
+        if($status){
+            $data = $PerformanceParam->getPerformanceByUserid($userId,1);
+            if($data){
+                $params_year = $data->year;
+                $params_month = $data->month;
+                $params_type = $data->type;
+                $params_status = $data->status;
+                $params_subunit = $data->subunit;
+
+                if($params_year){
+                    $check_year = explode(',',trim($params_year,','));
+                }
+                if($params_month){
+                    $check_month = explode(',',trim($params_month,','));
+                }
+                if($params_type){
+                    $check_type = explode(',',trim($params_type,','));
+                }
+                if($params_status){
+                    $check_status = explode(',',trim($params_status,','));
+                }
+                if($params_subunit){
+                    $check_subunit = explode(',',trim($params_subunit,','));
+                }
+
+            }
+        }
+        
+        $backArr = array();
+        if($status_one){
+            if($status){
+                $arr['checked'] = true;   
+            }
+            foreach($date['year'] as $k=>$v){
+                $arr = array();
+                $arr['label'] = $v.'年';
+                $arr['id'] = $v; 
+                if(in_array($v, $check_year)){
+                    $arr['checked'] = true;  
+                }else{
+                    $arr['checked'] = false;
+                }
+
+                $backArr['year'][] = $arr;
+            }
+        }
+        if($status_two){
+
+            foreach($date['month'] as $k=>$v){
+                $arr = array();
+                $arr['label'] = $v.'月';
+                $arr['id'] = $v; 
+                if(in_array($v, $check_month)){
+                    $arr['checked'] = true;  
+                }else{
+                    $arr['checked'] = false;
+                }
+                $backArr['month'][] = $arr;
+            }
+        }
+        if($status_three){
+            $list = $params['performanceStatus'];
+
+            foreach($list as $k=>$v){
+                $arr = array();
+                $arr['label'] = $v;
+                $arr['id'] = $k; 
+                if(in_array($k, $check_status)){
+                    $arr['checked'] = true;  
+                }else{
+                    $arr['checked'] = false;
+                }
+                $backArr['status'][] = $arr;
+            }
+        }
+        if($status_four){
+            $list = $params['performanceBath'];
+
+            foreach($list as $k=>$v){
+                $arr = array();
+                $arr['label'] = $v;
+                $arr['id'] = $k; 
+                if(in_array($k, $check_type)){
+                    $arr['checked'] = true;  
+                }else{
+                    $arr['checked'] = false;
+                }
+                $backArr['type'][] = $arr;
+            }
+        }
+        if($status_five){
+            $Subunit = new Subunit();
+            $list = $Subunit->getAllWorkStation();
+            foreach($list as $k=>$v){
+                $arr = array();
+                $arr['label'] = $v->name;
+                $arr['value'] = $v->id; 
+                if(in_array($v->id, $check_subunit)){
+                    $arr['checked'] = true;  
+                }else{
+                    $arr['checked'] = false;
+                }
+                $backArr['subunit'][] = $arr;
+            }
+        }
+        $this->serializer['status'] = true;
+        $this->serializer['errno'] = 0;
+        $this->serializer['message'] = '查询成功'; 
+        return $backArr;
+    }
+    /**
+     * @SWG\Post(path="/performance/save-bonus-config",
+     *     tags={"云平台-Performance-绩效"},
+     *     summary="保存奖金发放配置",
+     *     description="用户登录：成功返回用户信息；失败返回具体原因",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "60f5d74b625b79aafe22808f8bbddec4907f8204",
+     *        required = false,
+     *        type = "string"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "userField",
+     *        description = "工资号对应字段",
+     *        required = false,
+     *        type = "string"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "checkingField",
+     *        description = "需要校验的字段, 多个以逗号隔开",
+     *        required = false,
+     *        type = "string"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "userGroup",
+     *        description = "人员所属组配置,多个以逗号隔开 801:15,803:15",
+     *        required = false,
+     *        type = "string"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "登陆成功，返回用户信息"
+     *     ),
+     *     @SWG\Response(
+     *         response = 422,
+     *         description = "Data Validation Failed ",
+     *     )
+     * )
+     *
+     */
+    
+    public function actionSaveBonusConfig(){
+        $userField = Yii::$app->request->post('userField'); 
+        $checkingField = Yii::$app->request->post('checkingField'); 
+        $userGroup = Yii::$app->request->post('userGroup'); 
+
+        $userGroup = json_decode($userGroup);
+        $checkingField = json_decode($checkingField);
+
+        $customerId = $this->customerId;
+        $Subunit = new Subunit();
+        $BonusCalculationManageConfig = new BonusCalculationManageConfig();
+        $sub = $Subunit->getSubunitByCustomerId($customerId,1);
+        $groupId = $sub->id;
+
+        $data = $BonusCalculationManageConfig->getBonusByCustId($groupId,$customerId);
+
+        if($data){
+            $BonusCalculationManageConfig = $data;
+        }
+
+        if($userField){
+            $arr['sheetFields'] = 'emp_number';
+            $arr['sheetName'] = $userField;
+            $arr['sheetLocationY']  = '';
+            $arr['sheetLocationX']  = '';
+            $userFieldJson = json_encode($arr);
+            $BonusCalculationManageConfig->userField = $userFieldJson;
+        }
+        if($checkingField){
+            $arr = array();
+            $i=0;
+            foreach ($checkingField as $key => $value) {
+                if($value->val){
+                    $arr[$i]['sheetFields'] = '';
+                    $arr[$i]['sheetName'] = trim($value->val);
+                    $arr[$i]['sheetLocationY'] = '';
+                    $arr[$i]['sheetLocationX'] = '';
+                }
+                $i++;
+            }
+            // $arr = array();
+            // $checking = explode(',', $checkingField);
+
+            // foreach ($checking as $key => $value) {
+            //     if(empty($value)){
+            //         continue;
+            //     }
+            //     $arr[$key]['sheetFields'] = '';
+            //     $arr[$key]['sheetName'] = trim($value);
+            //     $arr[$key]['sheetLocationY'] = '';
+            //     $arr[$key]['sheetLocationX'] = '';
+            // }
+
+            $checkingJosn = json_encode($arr);
+            $BonusCalculationManageConfig->checkingField = $checkingJosn;
+        }
+
+        if($userGroup){
+            $i = 0 ;
+            $arr = array();
+            $User = new User();
+            foreach ($userGroup as $key => $value) {
+                foreach ($value->emp_number as $k => $v) {
+                    if(empty($v)){
+                        continue;
+                    }
+                    $arr[$i]['emp_number'] = $v;
+                    $arr[$i]['groupId'] = $value->id;
+                    $user = $User->getSystemUsersByEmpNumber($v);
+                    if($user){
+                        $arr[$key]['userName'] = $user->user_name;
+                    }else{
+                        $arr[$key]['userName'] = '';
+                    }
+                     
+                    $i++;
+                }
+            }
+
+
+
+            // $arr = array();
+            // $userList = explode(',', $userGroup);
+            // $User = new User();
+            // foreach ($userList as $key => $value) {
+            //     if(empty($value)){
+            //         continue;
+            //     }
+            //     $userval = explode(':', $value);
+
+            //     $arr[$key]['emp_number'] = $userval[0];
+            //     $arr[$key]['groupId'] = $userval[1];
+                
+                
+                
+            // }
+
+            $userJson = json_encode($arr);
+            $BonusCalculationManageConfig->userGroup = $userJson;
+        }
+        $BonusCalculationManageConfig->customerId = $customerId;
+        $BonusCalculationManageConfig->groupId = $groupId;
+
+        $istrue=$BonusCalculationManageConfig->save();
+
+        if($istrue){
+            $this->serializer['status'] = true;
+            $this->serializer['errno'] = 0;
+            $this->serializer['message'] = '添加成功';
+            return false;
+        }else{
+            $this->serializer['status'] = false;
+            $this->serializer['errno'] = 2;
+            $this->serializer['message'] = '添加失败';
+            return false;
+        }
+        
+        
+    }
+    /**
+     * @SWG\Post(path="/performance/get-bonus-config",
+     *     tags={"云平台-Performance-绩效"},
+     *     summary="获取奖金发放配置",
+     *     description="用户登录：成功返回用户信息；失败返回具体原因",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "60f5d74b625b79aafe22808f8bbddec4907f8204",
+     *        required = false,
+     *        type = "string"
+     *     ),
+     *     
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "登陆成功，返回用户信息"
+     *     ),
+     *     @SWG\Response(
+     *         response = 422,
+     *         description = "Data Validation Failed ",
+     *     )
+     * )
+     *
+     */
+    
+    public function actionGetBonusConfig(){
+        $customerId = $this->customerId;
+        $Subunit = new Subunit();
+        $Employee = new Employee();
+        $BonusCalculationManageConfig = new BonusCalculationManageConfig();
+        $sub = $Subunit->getSubunitByCustomerId($customerId,1);
+        $groupId = $sub->id;
+
+        $data = $BonusCalculationManageConfig->getBonusByCustId($groupId,$customerId);
+
+        $backArr = array();
+        if($data){
+            $BonusCalculationManageConfig = $data;
+
+            $userField = $BonusCalculationManageConfig->userField;
+            $checkingField = $BonusCalculationManageConfig->checkingField;
+            $userGroup = $BonusCalculationManageConfig->userGroup;
+
+            if($userField){
+                $userFieldArr = json_decode($userField);
+                
+                $backArr['userField'] = $userFieldArr->sheetName;
+            }else{
+                $backArr['userField'] = '';
+            }
+
+            if($checkingField){
+                $checkingFieldArr = json_decode($checkingField);
+
+                $arr = array();
+                foreach($checkingFieldArr as $k=>$v){
+                    
+                    if($v->sheetName){
+                        $arr[]=array('val'=>$v->sheetName,'hint'=>'请输入Excel中需要校验的列名：例如：'.$v->sheetName);
+                    }
+                }
+                $backArr['checkingField'] = $arr;
+            }else{
+                $backArr['checkingField'] = '';
+            }
+            if($userGroup){
+                $userGroupArr = json_decode($userGroup);
+                $arr = array();
+
+
+                foreach($userGroupArr as $k=>$v){ 
+
+
+                    if($v->groupId&&$v->emp_number){
+                        $arr[$v->groupId][] = $v->emp_number;
+
+                        // $employee = $Employee->getEmpByNumNber($v->emp_number);
+                        // $firstName = $employee->emp_firstname;
+
+                        // $sub = $Subunit->getDepartmentName($v->groupId);
+                        // $arr[]=array('label'=>$firstName,'emp_number'=>$v->emp_number,'val'=>$sub,'id'=>$v->groupId);
+                    }
+                }
+                $bacArr = array();
+                foreach ($arr as $key => $value) {
+                    $label = array();
+                    foreach ($value as $k => $v) {
+                        $label[] =(string)$v;
+                    }
+
+                    $bacArr[] = array('id'=>(string)$key,'emp_number'=>$label);
+                }
+                
+                $backArr['userGroup'] = $bacArr;
+            }else{
+                $backArr['userGroup'] = '';
+            }
+
+            $this->serializer['status'] = true;
+            $this->serializer['errno'] = 0;
+            $this->serializer['message'] = '获取成功';
+            return $backArr;
+            
+
+        }else{
+            $this->serializer['status'] = false;
+            $this->serializer['errno'] = 2;
+            $this->serializer['message'] = '获取失败';
+            return false;
+        }
+
+        
+        
+    }
+
+
+    /**
+     * @SWG\Post(path="/performance/get-bonus-manage",
+     *     tags={"云平台-Performance-绩效"},
+     *     summary="获取奖金管理列表",
+     *     description="用户登录：成功返回用户信息；失败返回具体原因",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "60f5d74b625b79aafe22808f8bbddec4907f8204",
+     *        required = false,
+     *        type = "string"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "year",
+     *        description = "年份 2018,2018",
+     *        required = false,
+     *        type = "string"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "month",
+     *        description = "月份 1,3",
+     *        required = false,
+     *        type = "string"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "status",
+     *        description = "状态 0,1",
+     *        required = false,
+     *        type = "string"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "subunit",
+     *        description = "组id 1,2",
+     *        required = false,
+     *        type = "string"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "page",
+     *        description = "分页",
+     *        required = false,
+     *        type = "string"
+     *     ),
+     *     
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "登陆成功，返回用户信息"
+     *     ),
+     *     @SWG\Response(
+     *         response = 422,
+     *         description = "Data Validation Failed ",
+     *     )
+     * )
+     *
+     */
+    
+    public function actionGetBonusManage(){
+        $year = Yii::$app->request->post('year'); 
+        $month = Yii::$app->request->post('month'); 
+        $status = Yii::$app->request->post('status'); 
+        $subunit = Yii::$app->request->post('subunit'); 
+        $page = Yii::$app->request->post('page'); 
+        #####查询条件存入数据库start#####
+        $PerformanceParam = new PerformanceParam();
+        $userId = $this->userId;
+        $customerId = $this->customerId;
+        $Pparm =  $PerformanceParam->getPerformanceByUserid($userId,1);
+
+        if($Pparm){
+            $PerformanceParam= $Pparm;
+        }else{
+            $PerformanceParam->user_id = $userId;
+            $PerformanceParam->state = 1;
+        }
+        $PerformanceParam->year = $year;
+        $PerformanceParam->month = $month;
+        $PerformanceParam->status = $status;
+        $PerformanceParam->subunit = $subunit;
+        $PerformanceParam->save();
+        #####查询条件存入数据库end#####
+        
+        
+        $Subunit = new Subunit();
+        $Employee = new Employee();
+
+        if(empty($page)){
+            $page  = 1; 
+        }
+
+        $pageSize = Yii::$app->params['pageSize']['default'];
+        $BonStatus = Yii::$app->params['performanceStatus'];
+        $search['limit'] = $pageSize;   //每页数 20
+        $offset = ($page >= 1) ? (($page - 1) * $pageSize) : 0;
+        $search['offset'] = $offset;
+        $search['customerId'] = $customerId;
+
+        if($year){
+            $date = array();
+            $yearArr = explode(',', trim($year,','));
+            if($month){
+                $monthArr = explode(',', trim($month,','));
+            }else{
+                $monthArr = array();
+            }
+
+            foreach($yearArr as $k=>$v){
+                if($monthArr){
+                    foreach($monthArr as $ks=>$vs){
+                        $dat = $v.'-'.$vs.'-'.'1';
+                        $date[] = date('Y-m-d',strtotime($dat));
+                    }
+                    
+                }else{
+                    for($i=1;$i<=12;$i++){
+                        $dat = $v.'-'.$i.'-'.'1';
+                        $date[] = date('Y-m-d',strtotime($dat));
+                    }
+                }
+            }
+            $search['year'] = $date;
+        }else{
+            $search['year'] = null;
+        }
+
+        if($status){
+            $statusArr = explode(',', trim($status,','));
+            $search['status'] = $statusArr;
+        }else{
+            $search['status'] = null;
+        }
+
+        if($subunit){
+            $subunitArr = explode(',', trim($subunit,','));
+            $search['subunit'] = $subunitArr;
+        }else{
+            $search['subunit'] = null;
+        }
+
+       
+        $BonusCalculationManage = new BonusCalculationManage();
+        $data = $BonusCalculationManage->getBonusCalculationManageSearch($search);
+        $count = $data['count'];
+        $backArr = array();
+        $i = 1;
+        foreach ($data['list'] as $key => $value) {
+            $arr = array();
+
+            $arr['serialNumber'] = $i+$offset;
+            $arr['id'] = $value->id;
+            $arr['date'] = date('Y年m月',strtotime($value->bonusDate));
+            $arr['subunitName'] = $value->subunit->name;
+            $arr['status'] = $BonStatus[$value->status];
+            $arr['statusId'] = $value->status;
+
+            $backArr[] = $arr;
+            $i++;
+        }
+
+        if($backArr){
+            $this->serializer['status'] = true;
+            $this->serializer['errno'] = 0;
+            $this->serializer['message'] = '获取成功';
+            return array('data'=>$backArr,'totalCount'=>(int)$count,'current_page'=>(int)$page,'pageSize'=>(int)$pageSize);
+            
+        }else{
+
+            $this->serializer['status'] = false;
+            $this->serializer['errno'] = 2;
+            $this->serializer['message'] = '获取失败';
+            return false;
+        }
+
+        
+        
+    }
+
+
+    /**
+     * @SWG\Post(path="/performance/add-bonus-manage",
+     *     tags={"云平台-Performance-绩效"},
+     *     summary="新增主任奖金计算",
+     *     description="用户登录：成功返回用户信息；失败返回具体原因",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "60f5d74b625b79aafe22808f8bbddec4907f8204",
+     *        required = false,
+     *        type = "string"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "year",
+     *        description = "年份2018",
+     *        required = false,
+     *        type = "string"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "month",
+     *        description = "月份 3",
+     *        required = false,
+     *        type = "string"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "登陆成功，返回用户信息"
+     *     ),
+     *     @SWG\Response(
+     *         response = 422,
+     *         description = "Data Validation Failed ",
+     *     )
+     * )
+     *
+     */
+    public function actionAddBonusManage(){
+        $year = Yii::$app->request->post('year'); 
+        $month = Yii::$app->request->post('month'); 
+
+        $SheeetHost =  env('SHEET_HOST_INFO');
+        if(empty($year)||empty($month)){
+            $this->serializer['status'] = false;
+            $this->serializer['errno'] = 2;
+            $this->serializer['message'] = '请选择日期';
+            return false;
+        }
+
+        $time = strtotime($year.'-'.$month);
+        if(!$time){
+            $this->serializer['status'] = false;
+            $this->serializer['errno'] = 2;
+            $this->serializer['message'] = '日期格式错误';
+            return false;
+        }
+
+        $bonusDate = date('Y-m-d',$time);
+        $bonusDateM = date('Ym',$time);
+        $customerId = $this->customerId;
+        if(!$customerId){
+            $this->serializer['status'] = false;
+            $this->serializer['errno'] = 2;
+            $this->serializer['message'] = '客户id错误';
+            return false;
+        }
+        $isBase = 1;
+        $status = 0;
+        $Subunit = new Subunit();
+        $sub = $Subunit->getSubunitByCustomerId($customerId,1);
+        $groupId = $sub->id;
+        $sheetName = 'bonus.'.$customerId.'.'.$groupId.'.'.$bonusDateM.'.manage';
+        $BonusCalculationManage = new BonusCalculationManage();
+
+        $bon = $BonusCalculationManage->getBonusCalculationManage($customerId,$bonusDate,$groupId);
+        if(!$bon){
+            $BonusCalculationManage->customerId = $customerId;
+            $BonusCalculationManage->bonusDate = $bonusDate;
+            $BonusCalculationManage->groupId = $groupId;
+            $BonusCalculationManage->isBase = $isBase;
+            $BonusCalculationManage->status = $status;
+            $BonusCalculationManage->sheetName = $sheetName;
+            $BonusCalculationManage->create_time = date('Y-m-d H:i:s');
+            $true = $BonusCalculationManage->save();
+
+            if($true){
+                $id = $BonusCalculationManage->id;
+                $backArr = array('sheetName'=>$sheetName,'url'=>$SheeetHost.$sheetName,'id'=>$id);
+                $this->serializer['status'] = true;
+                $this->serializer['errno'] = 0;
+                $this->serializer['message'] = '添加成功';
+                return $backArr;
+            }else{
+                $this->serializer['status'] = false;
+                $this->serializer['errno'] = 2;
+                $this->serializer['message'] = '添加失败';
+                return false;
+            }
+        }else{
+            $this->serializer['status'] = false;
+            $this->serializer['errno'] = 2;
+            $this->serializer['message'] = '你已经添加过了';
+            return false;
+        }
+    }
+
+    /**
+     * @SWG\Post(path="/performance/see-bonus-manage",
+     *     tags={"云平台-Performance-绩效"},
+     *     summary="下发前预览",
+     *     description="用户登录：成功返回用户信息；失败返回具体原因",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "60f5d74b625b79aafe22808f8bbddec4907f8204",
+     *        required = false,
+     *        type = "string"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "sheetName",
+     *        description = "excel名称",
+     *        required = false,
+     *        type = "string"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "id",
+     *        description = "manage表id",
+     *        required = false,
+     *        type = "string"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "登陆成功，返回用户信息"
+     *     ),
+     *     @SWG\Response(
+     *         response = 422,
+     *         description = "Data Validation Failed ",
+     *     )
+     * )
+     *
+     */
+    public function actionSeeBonusManage(){
+        $sheetName = Yii::$app->request->post('sheetName');
+        $id = Yii::$app->request->post('id');
+        $SheeetHost =  env('SHEET_HOST_INFO');
+        //$url = $SheeetHost.$sheetName.'.csv.json';
+        $url = $SheeetHost.$sheetName.'.csv.json';
+
+        $response = getCURLByExcel($url,1,'PUT');
+        $response = json_decode($response);
+        $customerId = $this->customerId;
+        if($response){
+            $Subunit = new Subunit();
+            $Employee = new Employee();
+            $BonusCalculationManageConfig = new BonusCalculationManageConfig();
+            $sub = $Subunit->getSubunitByCustomerId($customerId,1);
+            $groupId = $sub->id;
+            $data = $BonusCalculationManageConfig->getBonusByCustId($groupId,$customerId);
+
+            if($data){
+                $BonusCalculationManageConfig = $data;
+
+                $userField = $BonusCalculationManageConfig->userField;
+                $checkingField = $BonusCalculationManageConfig->checkingField;
+                $userGroup = $BonusCalculationManageConfig->userGroup;
+
+                if($userField){
+                    $userFieldArr = json_decode($userField);    
+                    $gongzihao = $userFieldArr->sheetName;
+                }else{
+                    $gongzihao = '工资号';
+                }
+
+                if($checkingField){
+                    $checkingFieldArr = json_decode($checkingField);
+                    $arr = array();
+                    $percent20 = $checkingFieldArr[0]->sheetName;
+                    $percent80 = $checkingFieldArr[1]->sheetName;
+                    $zu = $checkingFieldArr[2]->sheetName;
+                }else{
+                    $percent20 = '基本绩效工资';
+                    $percent80 = '除20%外合计';
+                    $zu = '组别';
+                }
+
+                if($userGroup){
+                    $userGroupArr = json_decode($userGroup);
+                    
+                   
+                    foreach($userGroupArr as $k=>$v){ 
+                        if($v->groupId&&$v->emp_number){
+                            $employee = $Employee->getEmpByNumNber($v->emp_number);
+                            $firstName = $employee->emp_firstname;
+                            $sub = $Subunit->getDepartmentName($v->groupId);
+                            //$GroupArr[$v->userName]=$sub;
+
+                            $userName = ltrim($v->userName,'0');
+                            $GroupArr[$userName]=$sub;
+                        }
+                    }
+                    
+                }else{
+                   $GroupArr = array();
+                }
+
+            }else{
+                $gongzihao = '工资号';
+                $percent20 = '基本绩效工资';
+                $percent80 = '除20%外合计';
+                $zu = '组别';
+                $GroupArr = array();
+            }
+            $arr = array();
+            $header = $response['0'];
+            if(!in_array($gongzihao,$header)){
+                $this->serializer['status'] = false;
+                $this->serializer['errno'] = 2;
+                $this->serializer['message'] = '奖金配置工资号列验证不成功';
+                return false;
+            }
+            if(!in_array($percent20,$header)){
+                $this->serializer['status'] = false;
+                $this->serializer['errno'] = 2;
+                $this->serializer['message'] = '奖金配置基本工资列验证不成功';
+                return false;
+            }
+            if(!in_array($percent80,$header)){
+                $this->serializer['status'] = false;
+                $this->serializer['errno'] = 2;
+                $this->serializer['message'] = '奖金配置除20%外合计列验证不成功';
+                return false;
+            }
+            unset($response[0]);
+            
+            $list = array();
+            foreach ($header as $key => $value) {
+     
+                foreach ($response as $k => $v) {
+                    if($value==$zu){
+                        $arr[]  = $v[$key];
+                    }
+                    
+                }
+            }
+
+            foreach ($response as $key => $value) {
+                $ar = array();
+                foreach ($header as $ks => $vs) {
+                    
+                    $ar[$vs] = $value[$ks];
+                }
+                $list[] = $ar;
+            }
+            //var_dump($list,$GroupArr);die;
+            $arr = array_unique($arr);
+            //var_dump($response);die;
+
+            $empArr = array();
+            foreach ($arr as $key => $value) {
+                $empArr[$value] = array();
+            }
+
+            foreach ($list as $k => $v) {
+                $lc  = ltrim($v[$gongzihao],'0');
+
+                if(!empty($GroupArr[$lc])){
+                    if(empty($empArr[$GroupArr[$lc]]['人数'])){
+                        $empArr[$GroupArr[$lc]]['人数'] = 0;
+                    }
+                    if(empty($empArr[$GroupArr[$lc]][$percent20])){
+                        $empArr[$GroupArr[$lc]][$percent20] = 0;
+                    }
+                    if(empty($empArr[$GroupArr[$lc]][$percent80])){
+                        $empArr[$GroupArr[$lc]][$percent80] = 0;
+                    }
+                    $empArr[$GroupArr[$lc]]['人数'] += 1;
+                    $empArr[$GroupArr[$lc]][$percent20] += $v[$percent20];
+                    $empArr[$GroupArr[$lc]][$percent80] += $v[$percent80];
+                    $empArr[$GroupArr[$lc]]['组名'] = $GroupArr[$lc];
+                }else{
+                    if(empty($empArr[$v[$zu]]['人数'])){
+                        $empArr[$v[$zu]]['人数'] = 0;
+                    }
+                    if(empty($empArr[$v[$zu]][$percent20])){
+                        $empArr[$v[$zu]][$percent20] = 0;
+                    }
+                    if(empty($empArr[$v[$zu]][$percent80])){
+                        $empArr[$v[$zu]][$percent80] = 0;
+                    }
+                    $empArr[$v[$zu]]['人数'] += 1;
+                    $empArr[$v[$zu]][$percent20] += $v[$percent20];
+                    $empArr[$v[$zu]][$percent80] += $v[$percent80];
+                    $empArr[$v[$zu]]['组名'] = $v[$zu];
+                }
+                
+            }
+
+            $backHeader = array();
+            $backEnd = array();
+            $backArr = array();
+            $backEnd['first'] = 0;
+            $backEnd['second'] = 0;
+            $backEnd['third'] = 0;
+            $backEnd['fourth'] = 0;
+            $i = 0 ;
+            foreach ($empArr as $key => $value) {
+                
+                if(empty($backHeader)){
+                    $backHeader['first'] = '组名';
+                    $backHeader['second'] = '人数';
+                    $backHeader['third'] = $percent20;
+                    $backHeader['fourth'] = $percent80;
+                }
+                $backArr[$i]['first'] = $value['组名'];
+                $backArr[$i]['second'] = $value['人数'];
+                $backArr[$i]['third'] = $value[$percent20];
+                $backArr[$i]['fourth'] = $value[$percent80];
+
+                $backEnd['first'] = '合计';
+                $backEnd['second'] += $value['人数'];
+                $backEnd['third'] += $value[$percent20];
+                $backEnd['fourth'] += $value[$percent80];
+
+                $i++;
+            }
+
+            array_unshift($backArr,$backHeader);
+            array_push($backArr,$backEnd);
+
+            $this->serializer['status'] = true;
+            $this->serializer['errno'] = 0;
+            $this->serializer['message'] = '';
+            return $backArr;
+            
+        }else{
+            $this->serializer['status'] = false;
+            $this->serializer['errno'] = 2;
+            $this->serializer['message'] = '获取数据失败';
+            return false;
+        }
+       
+
+    }
+
+    /**
+     * @SWG\Post(path="/performance/confirm-distribute",
+     *     tags={"云平台-Performance-绩效"},
+     *     summary="确认分发",
+     *     description="用户登录：成功返回用户信息；失败返回具体原因",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "60f5d74b625b79aafe22808f8bbddec4907f8204",
+     *        required = false,
+     *        type = "string"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "sheetName",
+     *        description = "excel名称",
+     *        required = false,
+     *        type = "string"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "id",
+     *        description = "manage表id",
+     *        required = false,
+     *        type = "string"
+     *     ),
+     *     
+     *     
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "登陆成功，返回用户信息"
+     *     ),
+     *     @SWG\Response(
+     *         response = 422,
+     *         description = "Data Validation Failed ",
+     *     )
+     * )
+     *
+     */
+    public function actionConfirmDistribute(){
+      
+        $sheetName = Yii::$app->request->post('sheetName');
+        $id = Yii::$app->request->post('id');
+        $SheeetHost =  env('SHEET_HOST_INFO');
+       
+        $url = $SheeetHost.$sheetName.'.csv.json';
+
+        $response = getCURLByExcel($url,1,'PUT');
+        $response = json_decode($response);
+        $customerId = $this->customerId;
+        if($response){
+            $Subunit = new Subunit();
+            $Employee = new Employee();
+            $User = new User();
+            $BonusCalculationManage = new BonusCalculationManage();
+            $BonusCalculationManageConfig = new BonusCalculationManageConfig();
+
+            $manage = $BonusCalculationManage->getBonusCalculationManageById($id);
+
+            if(!empty($manage)){
+                if($manage->status!=0){
+                    $this->serializer['status'] = false;
+                    $this->serializer['errno'] = 2;
+                    $this->serializer['message'] = '此次下发的excel状态不对已经下发过了';
+                    return false;
+                }
+            }else{
+                $this->serializer['status'] = false;
+                $this->serializer['errno'] = 2;
+                $this->serializer['message'] = '参数错误';
+                return false;
+            }
+
+            $sub = $Subunit->getSubunitByCustomerId($customerId,1);
+            $groupId = $sub->id;
+            $data = $BonusCalculationManageConfig->getBonusByCustId($groupId,$customerId);
+
+            if($data){
+                $BonusCalculationManageConfig = $data;
+
+                $userField = $BonusCalculationManageConfig->userField;
+                $checkingField = $BonusCalculationManageConfig->checkingField;
+                $userGroup = $BonusCalculationManageConfig->userGroup;
+
+                if($userField){
+                    $userFieldArr = json_decode($userField);    
+                    $gongzihao = $userFieldArr->sheetName;
+                }else{
+                    $gongzihao = '工资号';
+                }
+
+                if($checkingField){
+                    $checkingFieldArr = json_decode($checkingField);
+                    $arr = array();
+                    $percent20 = $checkingFieldArr[0]->sheetName;
+                    $percent80 = $checkingFieldArr[1]->sheetName;
+                    $zu = $checkingFieldArr[2]->sheetName;
+                }else{
+                    $percent20 = '基本绩效工资';
+                    $percent80 = '除20%外合计';
+                    $zu = '组别';
+                }
+
+                if($userGroup){
+                    $userGroupArr = json_decode($userGroup);
+                    $arr = array();              
+                    foreach($userGroupArr as $k=>$v){ 
+                        if($v->groupId&&$v->emp_number){
+                            $employee = $Employee->getEmpByNumNber($v->emp_number);
+                            $firstName = $employee->emp_firstname;
+                            $sub = $Subunit->getDepartmentName($v->groupId);
+
+                            $userName = ltrim($v->userName,'0');
+                            $GroupArr[$userName]=$sub;
+                        }
+                    }
+                    
+                }else{
+                   $GroupArr = array();
+                }
+
+            }else{
+                $gongzihao = '工资号';
+                $percent20 = '基本绩效工资';
+                $percent80 = '除20%外合计';
+                $zu = '组别';
+                $GroupArr = array();
+            }
+            $header = $response['0'];
+            if(!in_array($gongzihao,$header)){
+                $this->serializer['status'] = false;
+                $this->serializer['errno'] = 2;
+                $this->serializer['message'] = '奖金配置工资号列验证不成功';
+                return false;
+            }
+            if(!in_array($percent20,$header)){
+                $this->serializer['status'] = false;
+                $this->serializer['errno'] = 2;
+                $this->serializer['message'] = '奖金配置基本工资列验证不成功';
+                return false;
+            }
+            if(!in_array($percent80,$header)){
+                $this->serializer['status'] = false;
+                $this->serializer['errno'] = 2;
+                $this->serializer['message'] = '奖金配置除20%外合计列验证不成功';
+                return false;
+            }
+            unset($response[0]);
+            
+            $list = array();
+            foreach ($header as $key => $value) {
+     
+                foreach ($response as $k => $v) {
+                    if($value==$zu){
+                        $arr[]  = $v[$key];
+                    }
+                    
+                }
+            }
+
+            foreach ($response as $key => $value) {
+                $ar = array();
+                foreach ($header as $ks => $vs) {
+                    
+                    $ar[$vs] = $value[$ks];
+                }
+                $list[] = $ar;
+            }
+
+            $arr = array_unique($arr);
+            $empArr = array();
+            foreach ($arr as $key => $value) {
+                $subunit = $Subunit->getSubunitByName($value);
+                $subArr[$value] = $subunit['id'];
+            }
+    
+            $manage->status=10;
+            $mangeId = $manage->id;
+            $bonusDate = $manage->bonusDate;
+            if(empty($list)){
+                $this->serializer['status'] = false;
+                $this->serializer['errno'] = 2;
+                $this->serializer['message'] = '获取数据失败';
+                return false;
+            }
+            $subArr = array();
+            $calculation_id = null;
+            $manageId = null;
+            $bonArr = array();
+            foreach ($list as $k => $v) {
+                $lc  = ltrim($v[$gongzihao],'0');
+                $user = $User->getSystemUsersByUserName($v[$gongzihao]);
+
+                if($user){
+                    $BonusCalculationManageList = new BonusCalculationManageList();
+                    $emp_number = $user->emp_number;
+                    $las = $BonusCalculationManageList->getBonusCalculationManageListByDate($bonusDate,$emp_number);
+                    if($las){
+                        $BonusCalculationManageList = $las;
+                        
+                    }
+                    $BonusCalculationManageList->bonus_id = $mangeId;
+                    $BonusCalculationManageList->customerId = $customerId;
+                    $BonusCalculationManageList->bonusDate = $bonusDate;
+                    if(!empty($GroupArr[$lc])){
+                        $empSub = $Subunit->getSubunitByName($GroupArr[$lc]);
+                    }else{
+                        $empSub = $Subunit->getSubunitByName($v[$zu]);
+                    }
+                    $BonusCalculationManageList->groupId = $empSub['id'];
+                    $BonusCalculationManageList->status = 10;
+                    $BonusCalculationManageList->emp_number = $user->emp_number;
+                    $BonusCalculationManageList->percent20 = $v[$percent20];
+                    $BonusCalculationManageList->percent80 = $v[$percent80];
+                    $temp = $v;
+
+                    $BonusCalculationManageList->sheetInfo = json_encode($temp);
+                    $BonusCalculationManageList->create_time = date('Y-m-d H:i:s');
+                    $BonusCalculationManageList->save();
+                    
+                    if(!in_array($BonusCalculationManageList->groupId,$subArr)){
+
+                        $BonusCalculationManage = new BonusCalculationManage();
+                        $man = $BonusCalculationManage->getBonusCalculationManageBySub($bonusDate,$BonusCalculationManageList->groupId);
+
+                        if(!$man){
+                            $BonusCalculationManage->customerId = $customerId;
+                            $BonusCalculationManage->bonusDate = $bonusDate;
+                            $BonusCalculationManage->isBase = 0;
+                            $BonusCalculationManage->groupId = $BonusCalculationManageList->groupId;
+
+                            
+                            $bonusDateM = date('Ym',strtotime($bonusDate));
+                            $BonusCalculationManage->status = 10;
+                            $sheetName = 'bonus.'.$customerId.'.'.$BonusCalculationManageList->groupId.'.'.$bonusDateM.'.manage';
+                            $BonusCalculationManage->sheetName = $sheetName;
+                            $BonusCalculationManage->sendTime = date('Y-m-d H:i:s');
+                            $BonusCalculationManage->create_time = date('Y-m-d H:i:s');
+                            $BonusCalculationManage->save();
+                            $manageId= $BonusCalculationManage->id;
+                        }else{
+                            $manageId= $man->id;
+                            $BonusCalculationManage = $man;
+                        }
+
+
+                        //创建 组长表
+                        $BonusCalculation = new BonusCalculation();
+                        $bonusCalculation = $BonusCalculation->getBonusCalculationBySub($bonusDate,$BonusCalculationManageList->groupId);
+
+                        if(!$bonusCalculation){
+                            array_push($subArr, $BonusCalculationManageList->groupId);
+                            $BonusCalculation->bonus_id = $manageId;
+                            $BonusCalculation->customerId = $customerId;
+                            $BonusCalculation->bonusDate = $bonusDate;
+                            $BonusCalculation->groupId = $BonusCalculationManageList->groupId;
+                            $BonusCalculation->status = 0;
+                            // $bonusDateM = date('Ymd',strtotime($bonusDate));
+                            // $sheetName = $customerId.'.'.$bonusDateM.'.'.$BonusCalculationManageList->groupId;
+                            $BonusCalculation->sheetName = $BonusCalculationManage->sheetName;
+                            $BonusCalculation->receiveTime = date('Y-m-d H:i:s');
+                            $BonusCalculation->save();
+                            $calculation_id = $BonusCalculation->id;
+                        }else{
+                            $calculation_id = $bonusCalculation->id;
+                        }
+                        $bonArr[$BonusCalculationManageList->groupId] = array('bonus_id'=>$manageId,'calculation_id'=>$calculation_id);
+
+                    }
+
+                    if($calculation_id){
+                        $BonusCalculationList = new BonusCalculationList();
+                        $calst = $BonusCalculationList->getBonusCalculationListByDate($bonusDate,$emp_number);
+                        if($calst){
+                            $BonusCalculationList = $calst;
+                        }
+                        $BonusCalculationList->bonus_id = $bonArr[$BonusCalculationManageList->groupId]['bonus_id'];
+                        $BonusCalculationList->calculation_id = $bonArr[$BonusCalculationManageList->groupId]['calculation_id'];; 
+                        $BonusCalculationList->customerId = $customerId;
+                        $BonusCalculationList->bonusDate = $bonusDate;
+                        $BonusCalculationList->groupId = $BonusCalculationManageList->groupId;
+                        $BonusCalculationList->status = 0;
+                        $BonusCalculationList->emp_number = $emp_number;
+                        $BonusCalculationList->percent20 = $v[$percent20];
+                        $BonusCalculationList->percent80 = $v[$percent80];
+                        $temp = $v;
+                        $BonusCalculationList->sheetInfo = json_encode($temp);
+                        $BonusCalculationList->create_time = date('Y-m-d H:i:s');
+                        $BonusCalculationList->save();
+
+                    }
+                }
+   
+                
+            }
+            $this->serializer['status'] = true;
+            $this->serializer['errno'] = 0;
+            $this->serializer['message'] = '下发成功';
+            return true;
+            
+        }else{
+            $this->serializer['status'] = false;
+            $this->serializer['errno'] = 2;
+            $this->serializer['message'] = '获取数据失败';
+            return false;
+        }
+       
+
+    }
+
+
+    /**
+     * @SWG\Post(path="/performance/get-bonus-calculation",
+     *     tags={"云平台-Performance-绩效"},
+     *     summary="组长获取奖金列表",
+     *     description="用户登录：成功返回用户信息；失败返回具体原因",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "60f5d74b625b79aafe22808f8bbddec4907f8204",
+     *        required = false,
+     *        type = "string"
+     *     ),
+     *     
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "status",
+     *        description = "状态 0待上报,1已上报",
+     *        required = false,
+     *        type = "string"
+     *     ),
+
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "page",
+     *        description = "分页",
+     *        required = false,
+     *        type = "string"
+     *     ),
+     *     
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "登陆成功，返回用户信息"
+     *     ),
+     *     @SWG\Response(
+     *         response = 422,
+     *         description = "Data Validation Failed ",
+     *     )
+     * )
+     *
+     */
+    
+    public function actionGetBonusCalculation(){
+        $status = Yii::$app->request->post('status'); 
+        $subunit = $this->workStation; 
+        $page = Yii::$app->request->post('page'); 
+        
+        
+        
+        $Subunit = new Subunit();
+        $Employee = new Employee();
+
+        if(empty($page)){
+            $page  = 1; 
+        }
+
+        $pageSize = Yii::$app->params['pageSize']['default'];
+
+        $search['limit'] = $pageSize;   //每页数 20
+        $offset = ($page >= 1) ? (($page - 1) * $pageSize) : 0;
+        $search['offset'] = $offset;
+
+        if($status){
+            $search['status'] = $status;
+        }else{
+            $search['status'] = null;
+        }
+
+        if($subunit){
+            $search['subunit'] = $subunit;
+        }else{
+            $search['subunit'] = null;
+        }
+
+       
+        $BonusCalculation = new BonusCalculation();
+        $data = $BonusCalculation->getBonusCalculationSearch($search);
+
+        $count = $data['count'];
+        $backArr = array();
+        $i = 1;
+        foreach ($data['list'] as $key => $value) {
+            $arr = array();
+
+            $arr['serialNumber'] = $i+$offset;
+            $arr['id'] = $value->id;
+            $arr['date'] = date('Y年m月',strtotime($value->bonusDate));
+            $arr['subunitName'] = $value->subunit->name;
+            if($value->status){
+                $arr['status'] = '已上报';
+            }else{
+                $arr['status'] = '未上报';
+            }
+
+            if($value->receiveTime){
+                $arr['receiveTime'] = date('Y-m-d',strtotime($value->receiveTime));
+            }else{
+                $arr['receiveTime'] = '';
+            }
+            if($value->submitTime){
+                $arr['submitTime'] = date('Y-m-d',strtotime($value->submitTime));
+            }else{
+                $arr['submitTime'] = '';
+            }
+            
+            $arr['statusId'] = $value->status;
+
+            $backArr[] = $arr;
+            $i++;
+        }
+
+        if($backArr){
+            $this->serializer['status'] = true;
+            $this->serializer['errno'] = 0;
+            $this->serializer['message'] = '获取成功';
+            return array('data'=>$backArr,'totalCount'=>(int)$count,'current_page'=>(int)$page,'pageSize'=>(int)$pageSize);
+            
+        }else{
+
+            $this->serializer['status'] = false;
+            $this->serializer['errno'] = 2;
+            $this->serializer['message'] = '获取失败';
+            return false;
+        }
+
+        
+        
+    }
+
+    
+    
+}

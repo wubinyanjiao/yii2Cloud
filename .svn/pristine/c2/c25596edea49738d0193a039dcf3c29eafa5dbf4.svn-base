@@ -1,0 +1,677 @@
+<?php
+namespace frontend\controllers\v1;
+
+use common\models\curriculum\Curriculum;
+use common\models\curriculum\CurriculumFile;
+use common\models\employee\Employee;
+use common\models\overtime\Overtime;
+use common\models\overtime\ShiftResult;
+use common\models\reward\Reward;
+use common\models\user\User;
+use common\models\workload\WorkLoad;
+use yii\web\Response;
+use yii;
+
+class AchievementsController extends \common\rest\Controller
+{
+
+
+    /**
+     * @var string
+     */
+    public $modelClass = 'common\models\Curriculum';
+
+    /**
+     * @var array
+     */
+    public $serializer = [
+        'class' => 'common\rest\Serializer',    // 返回格式数据化字段
+        'collectionEnvelope' => 'data',       // 制定数据字段名称
+        'message' => '操作成功',                      // 文本提示
+    ];
+
+
+    /**
+     * @param  [action] yii\rest\IndexAction
+     * @return [type]
+     */
+    public function beforeAction($action)
+    {
+        $format = \Yii::$app->getRequest()->getQueryParam('format', 'json');
+
+        if ($format == 'xml') {
+            \Yii::$app->response->format = \yii\web\Response::FORMAT_XML;
+        } else {
+            \Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+        }
+
+        return $action;
+    }
+
+    /**
+     * @param  [type]
+     * @param  [type]
+     * @return [type]
+     */
+    public function afterAction($action, $result)
+    {
+        $result = parent::afterAction($action, $result);
+
+        return $result;
+    }
+
+    public function behaviors()
+    {
+        $behaviors = parent::behaviors();
+        $behaviors['contentNegotiator']['formats']['text/html'] = Response::FORMAT_HTML;
+        return $behaviors;
+    }
+
+
+    public function actions()
+    {
+        $actions = parent::actions();
+        unset($actions['index']);
+        return $actions;
+    }
+
+
+
+    /**
+     * @SWG\Post(path="/achievements/scheduling",
+     *     tags={"云平台-Achievements-绩效管理"},
+     *     summary="排班统计",
+     *     description="排班统计",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "time",
+     *        description = "时间",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回排班信息"
+     *     ),
+     * )
+     *
+     **/
+    public function actionScheduling()
+    {
+        $time = yii::$app->request->post('time');
+        $customer_id = $this->customerId;
+        $result = new ShiftResult();
+        $model = $result->scheduling($time,$customer_id);
+        return $model;
+    }
+
+
+
+    /**
+     * @SWG\Post(path="/achievements/scheduling-details",
+     *     tags={"云平台-Achievements-绩效管理"},
+     *     summary="排班统计详情",
+     *     description="排班统计详情",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "time",
+     *        description = "时间",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "id",
+     *        description = "组id",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回排班信息"
+     *     ),
+     * )
+     *
+     **/
+    public function actionSchedulingDetails(){
+        $time = yii::$app->request->post('time');
+        $id = yii::$app->request->post('id');
+        $result = new ShiftResult();
+        $model = $result->schedulingdetails($time,$id);
+        return $model;
+    }
+
+
+
+    /**
+     * @SWG\Post(path="/achievements/vacation",
+     *     tags={"云平台-Achievements-绩效管理"},
+     *     summary="假期统计图",
+     *     description="假期统计图",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "start_time",
+     *        description = "开始时间",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "end_time",
+     *        description = "结束时间",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回假期信息"
+     *     ),
+     * )
+     *
+     **/
+    public function actionVacation(){
+        $start_time = yii::$app->request->post('start_time');
+        $end_time = yii::$app->request->post('end_time');
+        $customer_id = $this->customerId;
+        $workStation = $this->workStation;
+        $result = new ShiftResult();
+        $model = $result->vacation($start_time,$end_time,$workStation,$customer_id);
+        return $model;
+    }
+
+
+    /**
+     * @SWG\Post(path="/achievements/vacation-table",
+     *     tags={"云平台-Achievements-绩效管理"},
+     *     summary="假期统计表格",
+     *     description="假期统计表格",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "start_time",
+     *        description = "开始时间",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "end_time",
+     *        description = "结束时间",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回假期信息"
+     *     ),
+     * )
+     *
+     **/
+    public function actionVacationTable(){
+        $start_time = yii::$app->request->post('start_time');
+        $end_time = yii::$app->request->post('end_time');
+        $customer_id = $this->customerId;
+        $workStation = $this->workStation;
+        $result = new ShiftResult();
+        $model = $result->vacationtable($start_time,$end_time,$workStation,$customer_id);
+        return $model;
+    }
+
+
+    /**
+     * @SWG\Post(path="/achievements/vacation-details",
+     *     tags={"云平台-Achievements-绩效管理"},
+     *     summary="假期详情",
+     *     description="假期详情",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "start_time",
+     *        description = "开始时间",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "end_time",
+     *        description = "结束时间",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "id",
+     *        description = "组id",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回假期信息"
+     *     ),
+     * )
+     *
+     **/
+    public function actionVacationDetails(){
+        $start_time = yii::$app->request->post('start_time');
+        $end_time = yii::$app->request->post('end_time');
+        $id = yii::$app->request->post('id');
+        $result = new ShiftResult();
+        $model = $result->vacationdetails($start_time,$end_time,$id);
+        return $model;
+
+    }
+
+    /**
+     * @SWG\Post(path="/achievements/subunit",
+     *     tags={"云平台-Achievements-绩效管理"},
+     *     summary="组数据",
+     *     description="组数据",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回排班信息"
+     *     ),
+     * )
+     *
+     **/
+    public function actionSubunit(){
+        $customer_id = $this->customerId;
+        $result = new ShiftResult();
+        $model = $result->subunit($customer_id);
+        return $model;
+    }
+
+
+
+
+
+    /**
+     * @SWG\Post(path="/achievements/workload-sum",
+     *     tags={"云平台-Achievements-绩效管理"},
+     *     summary="工作量统计",
+     *     description="工作量统计",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "start_time",
+     *        description = "开始时间",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "end_time",
+     *        description = "结束时间",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回工作量信息"
+     *     ),
+     * )
+     *
+     **/
+    public function actionWorkloadSum(){
+        $work_station = $this->workStation;
+        $start_time = Yii::$app->request->post('start_time');
+        $end_time = Yii::$app->request->post('end_time');
+        $reward = new Reward();
+        $model = $reward->workloadsum($work_station,$start_time,$end_time);
+        return $model;
+    }
+
+    /**
+     * @SWG\Post(path="/achievements/workload-sumsel",
+     *     tags={"云平台-Achievements-绩效管理"},
+     *     summary="工作量统计详情",
+     *     description="工作量统计详情",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "subunit_id",
+     *        description = "小组id",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "start_time",
+     *        description = "开始时间",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "end_time",
+     *        description = "结束时间",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回工作量信息"
+     *     ),
+     * )
+     *
+     **/
+    public function actionWorkloadSumsel(){
+        $subunit_id = Yii::$app->request->post('subunit_id');
+        $start_time = Yii::$app->request->post('start_time');
+        $end_time = Yii::$app->request->post('end_time');
+        $reward = new Reward();
+        $model = $reward->workloadsunsel($subunit_id,$start_time,$end_time);
+        return $model;
+    }
+
+
+    /**
+     * @SWG\Post(path="/achievements/workload-list",
+     *     tags={"云平台-Achievements-绩效管理"},
+     *     summary="工作量管理列表",
+     *     description="工作量管理列表",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "emp_name",
+     *        description = "员工姓名",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "subunit_id",
+     *        description = "小组id",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "start_time",
+     *        description = "开始时间",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "end_time",
+     *        description = "结束时间",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "page",
+     *        description = "页码",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回工作量信息"
+     *     ),
+     * )
+     *
+     **/
+    public function actionWorkloadList(){
+        $work_station = $this->workStation;
+        if ($work_station === 0){
+            $subunit_id = Yii::$app->request->post('subunit_id');
+        }else{
+            $subunit_id = $work_station;
+        }
+        $emp_name = Yii::$app->request->post('emp_name');
+        $start_time = Yii::$app->request->post('start_time');
+        $end_time = Yii::$app->request->post('end_time');
+        $page = Yii::$app->request->post('page');
+        $reward = new Reward();
+        $model = $reward->workloadlist($emp_name,$subunit_id,$start_time,$end_time,$page);
+        return $model;
+    }
+
+
+
+
+    /**
+     * @SWG\Post(path="/achievements/workweight-all",
+     *     tags={"云平台-Achievements-绩效管理"},
+     *     summary="全部审批",
+     *     description="全部审批",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回工作量信息"
+     *     ),
+     * )
+     *
+     **/
+    public function actionWorkweightAll(){
+        $work_station = $this->workStation;
+        if($work_station == 0){
+            $where = '';
+        }else{
+            $employee = Employee::find()->select(['emp_number'])->where(['work_station'=>$work_station])->all();
+            $emp_number = array_column($employee,'emp_number');
+            $emp_number = implode(",", $emp_number);
+            $where = "employee_id in ($emp_number)";
+        }
+        $work_load = WorkLoad::find()->where($where)->all();
+        foreach ($work_load as $k => $v){
+            $data = WorkLoad::find()->where(['id'=>$v['id']])->one();
+            $data->work_weight = $v['workload'];
+            $data->save();
+        }
+        return true;
+    }
+
+
+
+
+    /**
+     * @SWG\Post(path="/achievements/workload-update",
+     *     tags={"云平台-Achievements-绩效管理"},
+     *     summary="核对量编辑",
+     *     description="核对量编辑",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "id",
+     *        description = "工作量表id",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "work_weight",
+     *        description = "核对量",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回工作量信息"
+     *     ),
+     * )
+     *
+     **/
+    public function actionWorkloadUpdate(){
+        $id = Yii::$app->request->post('id');
+        $work_weight = Yii::$app->request->post('work_weight');
+        $work_load = WorkLoad::find()->where(['id'=>$id])->one();
+        $work_load->work_weight = $work_weight;
+        $info = $work_load->save();
+        return $info;
+    }
+
+
+
+    /**
+     * @SWG\Post(path="/achievements/demo",
+     *     tags={"云平台-Achievements-绩效管理"},
+     *     summary="demo",
+     *     description="demo",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "id",
+     *        description = "id",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "time",
+     *        description = "time",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回工作量信息"
+     *     ),
+     * )
+     *
+     **/
+    public function actionDemo(){
+        $workStation = yii::$app->request->post('id');
+        $time = yii::$app->request->post('time');
+        $user = new User();
+        $model = $user->FutureEmployee($workStation,$time);
+        return $model;
+    }
+
+
+
+    /**
+     * @SWG\Post(path="/achievements/overtime-sum",
+     *     tags={"云平台-Achievements-绩效管理"},
+     *     summary="考勤统计",
+     *     description="考勤统计",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "start_time",
+     *        description = "开始时间",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "end_time",
+     *        description = "结束时间",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回考勤统计信息"
+     *     ),
+     * )
+     *
+     **/
+    public function actionOvertimeSum(){
+        $data = yii::$app->request->post();
+        $overtime = new Overtime();
+        $customer_id = $this->customerId;
+        $workStation = $this->workStation;
+        $model = $overtime->overtimesum($data,$customer_id,$workStation);
+        return $model;
+    }
+
+}
+

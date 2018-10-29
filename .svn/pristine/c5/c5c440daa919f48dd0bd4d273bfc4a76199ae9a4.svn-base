@@ -1,0 +1,722 @@
+<?php
+namespace frontend\controllers\v1;
+
+use common\base\PasswordHash;
+use common\models\employee\Employee;
+use common\models\subunit\Subunit;
+use common\models\user\User;
+use frontend\modules\api\v1\resources\Article;
+use yii\rest\ActiveController;
+use yii\web\Response;
+use yii;
+
+class EmployeeController extends \common\rest\Controller
+{
+
+
+    /**
+     * @var string
+     */
+    public $modelClass = 'common\models\employee\Employee';
+
+    /**
+     * @var array
+     */
+    public $serializer = [
+        'class' => 'common\rest\Serializer',    // 返回格式数据化字段
+        'collectionEnvelope' => 'data',       // 制定数据字段名称
+        'message' => '操作成功',                      // 文本提示
+    ];
+
+
+    /**
+     * @param  [action] yii\rest\IndexAction
+     * @return [type]
+     */
+    public function beforeAction($action)
+    {
+        $format = \Yii::$app->getRequest()->getQueryParam('format', 'json');
+
+        if ($format == 'xml') {
+            \Yii::$app->response->format = \yii\web\Response::FORMAT_XML;
+        } else {
+            \Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+        }
+
+        return $action;
+    }
+
+    /**
+     * @param  [type]
+     * @param  [type]
+     * @return [type]
+     */
+    public function afterAction($action, $result)
+    {
+        $result = parent::afterAction($action, $result);
+
+        return $result;
+    }
+
+    public function behaviors()
+    {
+        $behaviors = parent::behaviors();
+        $behaviors['contentNegotiator']['formats']['text/html'] = Response::FORMAT_HTML;
+        return $behaviors;
+    }
+
+
+    public function actions()
+    {
+        $actions = parent::actions();
+        unset($actions['index']);
+        return $actions;
+    }
+
+
+    /**
+     * @SWG\Post(path="/employee/emp-phone",
+     *     tags={"云平台-Healthy-电话本"},
+     *     summary="电话本",
+     *     description="电话本",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回员工信息"
+     *     ),
+     * )
+     *
+     **/
+    public function actionEmpPhone()
+    {
+        $employee = new Employee();
+        $model = $employee->selempphone();
+        return $model;
+    }
+
+
+
+    /**
+     * @SWG\Post(path="/employee/user-add",
+     *     tags={"云平台-Employee-用户管理"},
+     *     summary="添加用户",
+     *     description="添加用户",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "password",
+     *        description = "密码",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "user_name",
+     *        description = "员工姓名",
+     *        required = false,
+     *        type = "string",
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "员工管理列表"
+     *     ),
+     *     @SWG\Response(
+     *         response = 403,
+     *         description = "查询失败",
+     *     )
+     * )
+     *
+     **/
+    public function actionUserAdd(){
+        $data = yii::$app->request->post();
+        $emp_number = $this->empNumber;
+        $employee = new Employee();
+        $model = $employee->useradd($data,$emp_number);
+        if($model==false){
+            $this->serializer['message'] ='您暂没有添加用户的权限';
+            return false;
+        }
+        return $model;
+    }
+
+    /**
+     * @SWG\Post(path="/employee/list",
+     *     tags={"云平台-Employee-用户管理"},
+     *     summary="用户管理列表",
+     *     description="用户管理列表",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "user_role_id",
+     *        description = "用户角色id",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "status",
+     *        description = "状态",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "emp_firstname",
+     *        description = "员工姓名",
+     *        required = false,
+     *        type = "string",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "page",
+     *        description = "页码",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "员工管理列表"
+     *     ),
+     *     @SWG\Response(
+     *         response = 403,
+     *         description = "查询失败",
+     *     )
+     * )
+     *
+     **/
+    public function actionList()
+    {
+
+        $user_name = yii::$app->request->post('user_name');
+        $user_role_id = yii::$app->request->post('user_role_id');
+        $emp_firstname = yii::$app->request->post('emp_firstname');
+        $status = yii::$app->request->post('status');
+        $page = yii::$app->request->post('page');
+        $employee = new Employee();
+        $model = $employee->index($emp_firstname, $user_role_id, $user_name, $status, $page);
+        if($model){
+            $this->serializer['message'] = '查询成功';
+        }else{
+            $this->serializer['message'] = '没有数据';
+        }
+        return $model;
+
+    }
+
+
+    /**
+     * @SWG\Post(path="/employee/delemp",
+     *     tags={"云平台-Employee-用户管理"},
+     *     summary="删除用户",
+     *     description="删除用户",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "emp_number",
+     *        description = "用户id",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回用户管理列表"
+     *     ),
+     *     @SWG\Response(
+     *         response = 403,
+     *         description = "查询失败",
+     *     )
+     * )
+     *
+     **/
+    public function actionDelemp()
+    {
+        $emp_numebr = yii::$app->request->post('emp_number');
+        $user = new User();
+        $query = $user::updateAll(['deleted'=>1],['emp_number'=>$emp_numebr]);
+        if ($query) {
+            return (['result' => $query, "code" => '200', "message" => '删除成功', "isSuccess" => true]);
+        } else {
+            return (['result' => $query, "code" => '403', "message" => '删除失败', "isSuccess" => false]);
+        }
+    }
+
+
+    /**
+     * @SWG\Post(path="/employee/structure",
+     *     tags={"云平台-Employee-用户管理"},
+     *     summary="获取组织结构",
+     *     description="获取组织结构",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回科室荣誉列表"
+     *     ),
+     *     @SWG\Response(
+     *         response = 403,
+     *         description = "查询失败",
+     *     )
+     * )
+     *
+     **/
+    public function actionStructure()
+    {
+        $subunit = new Employee();
+        $model = $subunit->selsub();
+        if($model){
+            $this->serializer['message'] = '查询成功';
+        }else{
+            $this->serializer['message'] = '没有数据';
+        }
+        return $model;
+    }
+
+
+    /**
+     * @SWG\Get(path="/employee/upemp",
+     *     tags={"云平台-Employee-用户管理"},
+     *     summary="用户详情",
+     *     description="用户详情",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "query",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "query",
+     *        name = "emp_number",
+     *        description = "用户id",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回列表"
+     *     ),
+     *     @SWG\Response(
+     *         response = 403,
+     *         description = "查询失败",
+     *     )
+     * )
+     *
+     **/
+
+
+    /**
+     * @SWG\Post(path="/employee/upemp",
+     *     tags={"云平台-Employee-用户管理"},
+     *     summary="用户详情修改",
+     *     description="用户详情修改",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "emp_number",
+     *        description = "用户id",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "user_name",
+     *        description = "工资号",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "emp_firstname",
+     *        description = "用户名",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "status",
+     *        description = "状态",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "id",
+     *        description = "角色id",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "password",
+     *        description = "password",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回用户管理列表"
+     *     ),
+     *     @SWG\Response(
+     *         response = 403,
+     *         description = "查询失败",
+     *     )
+     * )
+     *
+     **/
+    public function actionUpemp(){
+        if(Yii::$app->request->isGet){
+            $emp_number = yii::$app->request->get('emp_number');
+            $employee = new Employee();
+            $model = $employee->sel($emp_number);
+            return $model;
+        }else{
+            $data = yii::$app->request->post();
+            $employee = Employee::find()->where(['emp_number'=>$data['emp_number']])->one();
+            $employee->emp_firstname = $data['emp_firstname'];
+            $employee->save();
+            $user = User::find()->where(['emp_number'=>$data['emp_number']])->one();
+            $user->user_name = $data['user_name'];
+            $user->status = $data['status'];
+            $user->user_role_id = $data['id'];
+            if(isset($data['password'])){
+                $pass = new PasswordHash();
+                $password = $pass->hash($data['password']);
+                $user->user_password = $password;
+            }
+            $query = $user->save();
+            return $query;
+
+
+        }
+
+
+    }
+
+
+    /**
+     * @SWG\Get(path="/employee/delsub",
+     *     tags={"云平台-Employee-用户管理"},
+     *     summary="删除组织结构",
+     *     description="删除组织结构",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "query",
+     *        name = "id",
+     *        description = "id",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回列表"
+     *     ),
+     *     @SWG\Response(
+     *         response = 403,
+     *         description = "查询失败",
+     *     )
+     * )
+     *
+     **/
+    public function actionDelsub(){
+        $id = yii::$app->request->get('id');
+        $employee = new Employee();
+        $model = $employee->delsub($id);
+        if($model){
+            $this->serializer['message'] = '删除成功';
+        }else{
+            $this->serializer['message'] = '删除失败';
+        }
+        return $model;
+    }
+
+
+
+
+
+
+
+
+    /**
+     * @SWG\Get(path="/employee/upsub",
+     *     tags={"云平台-Employee-用户管理"},
+     *     summary="组织结构详情",
+     *     description="组织结构详情",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "query",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "query",
+     *        name = "id",
+     *        description = "id",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回列表"
+     *     ),
+     *     @SWG\Response(
+     *         response = 403,
+     *         description = "查询失败",
+     *     )
+     * )
+     *
+     **/
+    /**
+     * @SWG\Post(path="/employee/upsub",
+     *     tags={"云平台-Employee-用户管理"},
+     *     summary="修改组织结构",
+     *     description="修改组织结构",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "id",
+     *        description = "组织表id",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "unit_id",
+     *        description = "上一级id",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "name",
+     *        description = "组织名",
+     *        required = true,
+     *        type = "string",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "emp_number",
+     *        description = "组长名",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "demp_number",
+     *        description = "副组长名",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "description",
+     *        description = "描述",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "员工管理列表"
+     *     ),
+     *     @SWG\Response(
+     *         response = 403,
+     *         description = "查询失败",
+     *     )
+     * )
+     *
+     **/
+    public function actionUpsub(){
+        $subunit = new Employee();
+        if(Yii::$app->request->isGet){
+            $id = yii::$app->request->get('id');
+            $model = $subunit->selup($id);
+            return $model;
+        }else{
+            $data = yii::$app->request->post();
+            $model= $subunit->upsub($data);
+            return $model;
+        }
+    }
+
+
+
+
+
+
+
+    /**
+     * @SWG\Post(path="/employee/addsub",
+     *     tags={"云平台-Employee-用户管理"},
+     *     summary="添加组织结构",
+     *     description="添加组织结构",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "unit_id",
+     *        description = "上级id",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "name",
+     *        description = "组织名",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "emp_number",
+     *        description = "组长名",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "demp_number",
+     *        description = "副组长名",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "is_holiday",
+     *        description = "是否关联假期，0 否，1是 ",
+     *        required = false,
+     *        type = "integer",
+     *        default = 1,
+     *        enum = {0,1}
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "description",
+     *        description = "描述",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回列表"
+     *     ),
+     *     @SWG\Response(
+     *         response = 403,
+     *         description = "查询失败",
+     *     )
+     * )
+     *
+     **/
+    public function actionAddsub(){
+        $data = yii::$app->request->post();
+        $name = $data['name'];
+        $subunit = new Subunit();
+        $info = $subunit::find()->asArray()->select('id')->where(['name'=>$name])->one();
+        //return $info;
+        if($info != ''){
+           $this->serializer['message'] = '组名已经存在';
+           $this->serializer['status'] = false;
+           return false;
+        }
+        $employee = new Employee();
+        $model = $employee->addsub($data);
+        return $model;
+    }
+
+
+
+    /**
+     * @SWG\Post(path="/employee/role",
+     *     tags={"云平台-Employee-用户管理"},
+     *     summary="获取用户角色",
+     *     description="获取用户角色",
+     *     produces={"application/json"},
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回小组列表"
+     *     ),
+     *     @SWG\Response(
+     *         response = 403,
+     *         description = "查询失败",
+     *     )
+     * )
+     *
+     **/
+    /*
+   * 获取用户角色
+   * **/
+    public function actionRole(){
+        $employee = new Employee();
+        $model = $employee->role();
+        return $model;
+    }
+
+
+    /**
+     * @SWG\Post(path="/employee/group",
+     *     tags={"云平台-Employee-用户管理"},
+     *     summary="获取小组人名",
+     *     description="获取小组人名",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "id",
+     *        description = "小组id",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回小组列表"
+     *     ),
+     *     @SWG\Response(
+     *         response = 403,
+     *         description = "查询失败",
+     *     )
+     * )
+     *
+     **/
+    public function actionGroup(){
+        $id = $this->workStation;
+        $employee = new Employee();
+        $model = $employee->group($id);
+        return $model;
+    }
+
+
+}
+

@@ -1,0 +1,239 @@
+<?php
+/**
+ * @link http://www.yiiframework.com/
+ * @copyright Copyright (c) 2008 Yii Software LLC
+ * @license http://www.yiiframework.com/license/
+ */
+
+namespace common\rest;
+
+use Yii;
+use yii\filters\auth\CompositeAuth;
+use yii\filters\ContentNegotiator;
+use yii\filters\RateLimiter;
+use yii\web\Response;
+use yii\filters\VerbFilter;
+
+/**
+ * Controller is the base class for RESTful API controller classes.
+ *
+ * Controller implements the following steps in a RESTful API request handling cycle:
+ *
+ * 1. Resolving response format (see [[ContentNegotiator]]);
+ * 2. Validating request method (see [[verbs()]]).
+ * 3. Authenticating user (see [[\yii\filters\auth\AuthInterface]]);
+ * 4. Rate limiting (see [[RateLimiter]]);
+ * 5. Formatting response data (see [[serializeData()]]).
+ *
+ * For more details and usage information on Controller, see the [guide article on rest controllers](guide:rest-controllers).
+ *
+ * @author Qiang Xue <qiang.xue@gmail.com>
+ * @since 2.0
+ */
+
+use common\models\system\SystemUsers;
+use common\models\system\MemberToken; 
+use common\models\subunit\Subunit;
+class Controller extends \yii\web\Controller
+{
+    /**
+     * @var string|array the configuration for creating the serializer that formats the response data.
+     */
+    public $serializer = 'common\rest\Serializer';
+    /**
+     * @inheritdoc
+     */
+    public $enableCsrfValidation = false;
+
+    public $Token = null;
+    public $userId = null;
+    public $userRoleId = null;
+    public $userName = null;
+    public $firstName = null;
+    public $empNumber = null;
+    public $workStation = 0;
+    public $workStationName = null;
+    public $_version = 'v1';
+    public $_isFalse = false;
+    public $isLeader = false;    //是否是组长
+    public $isDirector = false;  //是否是主任
+    public $customerId = null;   //客户ID
+
+    public $isShiftManager=false; //是否是排班人员
+
+
+
+    /**
+     * @inheritdoc
+     */
+    public function behaviors()
+    {
+        return [
+            'contentNegotiator' => [
+                'class' => ContentNegotiator::className(),
+                'formats' => [
+                    'application/json' => Response::FORMAT_JSON,
+                    'application/xml' => Response::FORMAT_XML,
+                ],
+            ],
+            'verbFilter' => [
+                'class' => VerbFilter::className(),
+                'actions' => $this->verbs(),
+            ],
+            'authenticator' => [
+                'class' => CompositeAuth::className(),
+            ],
+            'rateLimiter' => [
+                'class' => RateLimiter::className(),
+            ],
+        ];
+    }
+
+    public function init(){
+        if($_SERVER['REQUEST_METHOD']=='OPTIONS'){
+            echo 1;die;
+        }
+        $url = ltrim($_SERVER['REQUEST_URI'],'/');
+        //$url = strstr($url,'/');
+        $url = explode('/',$url);
+        $d = Array_pop($url);
+        $f = Array_pop($url);
+        $url = '/'.$f.'/'.$d;
+       // $onturl = array('/sign-in/logout');  ///sign-in/login
+        $onturl = array('/sign-in/login','/sign-in/logout','/employee/emp-phone','/weixin/open-verification','/weixin/user-login');  ///sign-in/login
+
+        if(!in_array($url,$onturl)){
+            $Tokens=Yii::$app->request->post('Token'); 
+            if(null== $Tokens){
+                $Tokens=Yii::$app->request->get('Token');
+            }
+            $Token = @$_SERVER['HTTP_AUTHORIZATION'];
+            //$Token = '1212'; 
+            
+            if(empty($Token)){
+                if(empty($Tokens)){
+                    $result['status'] = false;
+                    $result['message'] ='Token不能为空';
+                    $result['errno'] ='0';
+                    echo json_encode($result);die;
+
+                }else{
+                    $Token = $Tokens;
+                }
+                
+            }else{
+                $Tstring = explode('token', $Token);
+
+                if(is_base64($Tstring[1])){
+                    $Token_arr = base64_decode(base64_decode($Tstring[1]));
+                    $TokenArray = explode(':', $Token_arr);
+                    $Token  = trim($TokenArray[2]);
+                }else{
+                    $Token = trim($Tstring[1]);
+                }
+
+                
+
+     
+                 
+            }
+
+ 
+            $MemberToken = new MemberToken();
+            $detail= $MemberToken->getTokenByToken($Token);
+
+            if(empty($detail)){
+    
+                $result['status'] = false;
+                $result['message'] ='Token不正确';
+                $result['errno'] =401;
+                $result['data'] = $Token;
+                echo json_encode($result);die;
+
+            }else{  
+                 $userId = $detail['userid'];
+                 $SystemUser = new SystemUsers();
+                 $user = $SystemUser->searchSystemUsersById($userId);
+
+                 if(!empty($user['id'])){
+                     $this->Token = $Token;
+                     $this->userRoleId = $user['user_role_id'];
+                     $this->empNumber = $user['emp_number'];
+                     $this->firstName = $user['employee']['emp_firstname'];
+                     $this->userId = $user['id'];
+                     $this->userName = $user['user_name'];
+                     $this->customerId = $user['customer_id'];
+
+                     if($this->userId==1){
+                        $this->firstName = $this->userName;
+                     }
+
+                     $isLeader = $user['employee']['is_leader'];
+
+                     if($isLeader){
+                        $this->isLeader = true;
+                     }else{
+                        if($this->userRoleId==8){
+                            $this->isLeader = true;
+                        }
+                     }
+
+                     if($this->userRoleId==4||$this->userRoleId==5){
+                        $this->isDirector = true;
+                     }
+
+                     if($this->userRoleId ==12  ){
+                        $this->isShiftManager = true;
+                     }
+
+                     if($user['employee']['work_station']){
+                        $this->workStation = (int)$user['employee']['work_station'];
+                        $Subunit = new Subunit();
+                        $station = $Subunit->getWorkStationById($user['employee']['work_station']);
+                        $this->workStationName  = $station->name;
+                        
+                     }
+                 }else{
+                    $result['status'] = false;
+                    $result['message'] ='找不到此用户';
+                    $result['errno'] ='0';
+                    echo json_encode($result);die;
+                 }
+            }
+
+        }
+
+
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function afterAction($action, $result)
+    {
+        $result = parent::afterAction($action, $result);
+        return $this->serializeData($result);
+    }
+
+    /**
+     * Declares the allowed HTTP verbs.
+     * Please refer to [[VerbFilter::actions]] on how to declare the allowed verbs.
+     * @return array the allowed HTTP verbs.
+     */
+    protected function verbs()
+    {
+        return [];
+    }
+
+    /**
+     * Serializes the specified data.
+     * The default implementation will create a serializer based on the configuration given by [[serializer]].
+     * It then uses the serializer to serialize the given data.
+     * @param mixed $data the data to be serialized
+     * @return mixed the serialized data.
+     */
+    protected function serializeData($data)
+    {
+        return Yii::createObject($this->serializer)->serialize($data);
+    }
+}

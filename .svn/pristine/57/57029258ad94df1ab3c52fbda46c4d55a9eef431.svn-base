@@ -1,0 +1,348 @@
+<?php
+
+namespace common\models\education;
+
+use common\models\attachment\Attachment;
+use common\models\Employee;
+use common\models\user\User;
+use Yii;
+use \common\models\education\base\Education as BaseEducation;
+use yii\helpers\ArrayHelper;
+
+/**
+ * This is the model class for table "hs_hr_education".
+ */
+class Education extends BaseEducation
+{
+
+    public function behaviors()
+    {
+        return ArrayHelper::merge(
+            parent::behaviors(),
+            [
+                # custom behaviors
+            ]
+        );
+    }
+
+    public function rules()
+    {
+        return ArrayHelper::merge(
+            parent::rules(),
+            [
+                # custom validation rules
+            ]
+        );
+    }
+
+
+    public function addeducation($data){
+
+        $emp_number = $data['emp_number'];
+        $student = isset($data['student'])?$data['student']:'';
+        $type_id = isset($data['type_id'])?$data['type_id']:'';
+        $start_time = isset($data['start_time'])?$data['start_time']:'';
+        $content = isset($data['content'])?$data['content']:'';
+        if($start_time != ''){
+            $start_time=strtotime($start_time);
+            $start_time=date('Y-m-d',$start_time);
+        }
+        $end_time = isset($data['end_time'])?$data['end_time']:'';
+        if($end_time != ''){
+            $end_time=strtotime($end_time);
+            $end_time=date('Y-m-d',$end_time);
+        }
+
+
+        $employee = new Employee();
+        $emp = $employee::find()->asArray()->select(['emp_number'])->where(['emp_firstname'=>$student])->one();
+        if($emp == ''){
+            return false;
+        }
+        $education = new Education();
+        $education->emp_number = $emp_number;
+        $education->student_id = $emp['emp_number'];
+        $education->type_id = $type_id;
+        $education->start_time = $start_time;
+        $education->end_time = $end_time;
+        $education->content = $content;
+        $query = $education->save();
+        return $query;
+    }
+
+
+
+    public function add($data){
+
+        $name = isset($data['name'])?$data['name']:'';
+        $student = isset($data['student'])?$data['student']:'';
+        $type_id = isset($data['type_id'])?$data['type_id']:'';
+        $start_time = isset($data['start_time'])?$data['start_time']:'';
+        $content = isset($data['content'])?$data['content']:'';
+        if($start_time != ''){
+            $start_time=strtotime($start_time);
+            $start_time=date('Y-m-d',$start_time);
+        }
+        $end_time = isset($data['end_time'])?$data['end_time']:'';
+        if($end_time != ''){
+            $end_time=strtotime($end_time);
+            $end_time=date('Y-m-d',$end_time);
+        }
+
+
+        $employee = new Employee();
+        $emp = $employee::find()->asArray()->select(['emp_number'])->where(['emp_firstname'=>$student])->one();
+
+        if($emp == ''){
+            return false;
+        }
+        $empname = $employee::find()->asArray()->select(['emp_number'])->where(['emp_firstname'=>$name])->one();
+        if($empname == ''){
+            return false;
+        }
+        $education = new Education();
+        $education->emp_number = $empname['emp_number'];
+        $education->student_id = $emp['emp_number'];
+        $education->type_id = $type_id;
+        $education->start_time = $start_time;
+        $education->end_time = $end_time;
+        $education->content = $content;
+        $query = $education->save();
+        return $query;
+    }
+
+
+
+
+
+
+    public function educationtype(){
+        $query = EducationType::find()->all();
+        return $query;
+    }
+
+
+    public function list($data){
+        $emp_number = isset($data['emp_number'])?$data['emp_number']:'';
+        $student = isset($data['student'])?$data['student']:'';
+        $type_id = isset($data['type_id'])?$data['type_id']:'';
+        $start_time = isset($data['start_time'])?$data['start_time']:'';
+        if($start_time != ''){
+            $start_time=strtotime($start_time);
+            $start_time=date('Y-m-d',$start_time);
+        }
+        $end_time = isset($data['end_time'])?$data['end_time']:'';
+        if($end_time != ''){
+            $end_time=strtotime($end_time);
+            $end_time=date('Y-m-d',$end_time);
+        }
+
+        if($student != ''){
+            $employee = new Employee();
+            $emp = $employee::find()->asArray()->select(['emp_number'])->where(['emp_firstname'=>$student])->one();
+            if($emp == ''){
+                $student == '';
+            }else{
+                $student = $emp['emp_number'];
+            }
+        }else{
+            $student == '';
+        }
+
+
+
+        $student_id = $student;
+
+        $where = '1 = 1';
+        if($emp_number != ''){
+            $where .=" and a.emp_number = '$emp_number'";
+        }
+        if($student_id != ''){
+            $where .=" and a.student_id = '$student_id'";
+        }
+        if($type_id != ''){
+            $where .=" and a.type_id = '$type_id'";
+        }
+        if($start_time != ''){
+            $where .=" and a.start_time > '$start_time'";
+        }
+        if($end_time != ''){
+            $where .=" and a.end_time < '$end_time'";
+        }
+
+
+        $query = (new yii\db\Query())
+            ->select(['a.*','b.emp_firstname','c.type','d.user_name'])
+            ->from('orangehrm_mysql.hs_hr_education a')
+            ->leftJoin('orangehrm_mysql.hs_hr_employee b','a.emp_number=b.emp_number')
+            ->leftJoin('orangehrm_mysql.hs_hr_education_type c','a.type_id=c.id')
+            ->leftJoin('orangehrm_mysql.ohrm_user d','a.emp_number=d.emp_number')
+            ->where($where)
+            ->all();
+
+        $employee = new Employee();
+        foreach ($query as $k => $v){
+            $arr = $employee::find()->select(['emp_firstname'])->where(['emp_number'=>$v['student_id']])->one();
+            $query[$k]['student'] = $arr['emp_firstname'];
+            $total_month = $this->getMonthNum($v['end_time'],$v['start_time'],'-');
+            $query[$k]['time'] = $total_month;
+        }
+        return $query;
+    }
+
+
+    public function educationdel($id){
+        $info = Education::deleteAll(['id'=>$id]);
+        if($info){
+            $info = Attachment::find()->where(['sort_id'=>$id,'screen'=>'education'])->one();
+            if ($info){
+                foreach ($id as $k=>$v){
+                    $url = Attachment::find()->select(['eattach_attachment_url'])->where(['sort_id'=>$v,'screen'=>'education'])->one();
+                    if($url != ''){
+                        $delurl = '/data/wwwroot/uploadfile/'.$url['eattach_attachment_url'];
+                        unlink($delurl);
+                    }
+                }
+                $query = Attachment::deleteAll(['sort_id'=>$id,'screen'=>'education']);
+                return $query;
+            }
+        }else{
+            return $info;
+        }
+    }
+
+
+
+    public function attachmentdel($emp_number,$id){
+        foreach ($id as $k=>$v){
+            $arr[$k]['id'] = $v;
+            $arr[$k]['emp_number'] = $emp_number[$k];
+        }
+        $attachment = new Attachment();
+        foreach ($arr as $k=>$v){
+            $url = $attachment::find()->select(['eattach_attachment_url'])->where(['eattach_id'=>$v['id'],'emp_number'=>$v['emp_number']])->one();
+            if($url != ''){
+                unlink($url['eattach_attachment_url']);
+            }
+            $query = $attachment::deleteAll(['eattach_id'=>$v['id'],'emp_number'=>$v['emp_number']]);
+        }
+        return $query;
+    }
+
+    public function scorelist($emp_number,$month){
+        if($emp_number != ''){
+            $where ="a.emp_number = '$emp_number'";
+        }else{
+            $where ='';
+        }
+
+        $data = array(
+            array('label'=>'1','title'=>'优'),
+            array('label'=>'2','title'=>'良'),
+            array('label'=>'3','title'=>'中'),
+            array('label'=>'4','title'=>'差'));
+
+        $query = (new yii\db\Query())
+            ->select('b.emp_firstname,a.student_id')
+            ->from('orangehrm_mysql.hs_hr_education a')
+            ->leftJoin('orangehrm_mysql.hs_hr_employee b','a.student_id = b.emp_number')
+            ->where($where)
+            ->all();
+        foreach ($query as $k=>$v){
+            $arr = EducationScore::find()->select('month,score')->where(['month'=>$month,'student_id'=>$v['student_id']])->one();
+            $query[$k]['month'] = $arr['month'];
+            $query[$k]['score'] = $arr['score'];
+            $query[$k]['checkstatus'] = $data;
+        }
+        return $query;
+    }
+
+
+    public function score($data){
+        $month = $data['month'];
+        $data = $data['data'];
+        $score = new EducationScore();
+
+        foreach ($data as $k =>$v){
+            $arr = $score::find()->where(['month'=>$month,'student_id'=>$v['student_id']])->one();
+            if($arr == ''){
+                $score->score = $v['score'];
+                $score->student_id = $v['student_id'];
+                $score->month = $month;
+                $query = $score->save();
+
+            }else{
+                $arr->score = $v['score'];
+                $arr->month = $month;
+                $query = $arr->save();
+            }
+        }
+        return true;
+    }
+
+    public function educationsel($id){
+        $arr = Education::find()->asArray()->where(['id'=>$id])->one();
+        $teacher = Employee::find()->asArray()->select(['emp_firstname'])->where(['emp_number'=>$arr['emp_number']])->one();
+        $student = Employee::find()->asArray()->select(['emp_firstname'])->where(['emp_number'=>$arr['student_id']])->one();
+        $data['month'] = EducationScore::find()->asArray()->select('month')->where(['student_id'=>$arr['student_id']])->all();
+        $data['score'] = EducationScore::find()->asArray()->select('score')->where(['student_id'=>$arr['student_id']])->all();
+        $type = EducationType::find()->asArray()->select('type')->where(['id'=>$arr['type_id']])->one();
+        $user_name = User::find()->asArray()->select('user_name')->where(['emp_number'=>$arr['emp_number']])->one();
+        $atta = Attachment::find()->where(['sort_id'=>$id,'screen'=>'education'])->all();
+
+        foreach ($data['month'] as $k =>$v){
+            $data['month'][$k]['month'] = $v['month'].'月';
+        }
+
+        foreach ($data['score'] as $k => $v){
+            if($v['score'] == 1){
+                $data['score'][$k]['score'] = '优';
+            }
+            if($v['score'] == 2){
+                $data['score'][$k]['score'] = '良';
+            }
+            if($v['score'] == 3){
+                $data['score'][$k]['score'] = '中';
+            }
+            if($v['score'] == 4){
+                $data['score'][$k]['score'] = '差';
+            }
+        }
+        if(empty($data['score'])){
+            $data['score'] = array();
+        }else{
+            $data['score'] = array(array('data'=>$data['score']));
+        }
+
+
+        $total_month = $this->getMonthNum($arr['end_time'],$arr['start_time'],'-');
+        $arr['time']  =$total_month;
+        $arr['teacher'] = $teacher['emp_firstname'];
+        $arr['student'] = $student['emp_firstname'];
+        $arr['user_name'] = $user_name['user_name'];
+        $arr['type'] = $type['type'];
+        $arr['data'] = $data;
+        $arr['atta'] = $atta;
+
+        return $arr;
+    }
+
+
+    function getMonthNum( $date1, $date2, $tags='-' ){
+        $date1 = explode($tags,$date1);
+        $date2 = explode($tags,$date2);
+        return abs($date2[0] - $date1[0]) * 12 + ($date2[1] - $date1[1]);
+    }
+
+    public function selname(){
+        $where = "a.user_name like '%1000%'";
+        $query = (new yii\db\Query())
+            ->select('b.emp_firstname')
+            ->from('orangehrm_mysql.ohrm_user a')
+            ->leftJoin('orangehrm_mysql.hs_hr_employee b','a.emp_number = b.emp_number')
+            ->where($where)
+            ->all();
+        return $query;
+    }
+
+}

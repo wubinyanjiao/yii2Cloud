@@ -1,0 +1,670 @@
+<?php
+
+namespace common\models\shift;
+
+use Yii;
+use \common\models\shift\base\ShiftResultConfirm as BaseShiftResultConfirm;
+use yii\helpers\ArrayHelper;
+use common\models\leave\LeaveEntitlement;
+use common\models\leave\LeaveType;
+use common\models\shift\ShiftType;
+use common\models\shift\ShiftOrderBy;
+use common\models\employee\Employee;
+use common\models\shift\ShiftDate;
+
+
+/**
+ * This is the model class for table "ohrm_work_shift_result_confirm".
+ */
+class ShiftResultConfirm extends BaseShiftResultConfirm
+{
+
+    public function behaviors()
+    {
+        return ArrayHelper::merge(
+            parent::behaviors(),
+            [
+                # custom behaviors
+            ]
+        );
+    }
+
+    public function rules()
+    {
+        return ArrayHelper::merge(
+            parent::rules(),
+            [
+                # custom validation rules
+            ]
+        );
+    }
+
+    public function addConfrim($data){
+        if ($this->load($data) && $this->save()){
+            return true;
+        }else {
+             return false;
+        }
+    }
+
+    public function getRosterResultConfirm($schedule_id){
+        $query = (new \yii\db\Query())
+        ->from('orangehrm_mysql.ohrm_work_shift_result_confirm')
+        ->where(['schedule_id'=>$schedule_id])
+        ->all();
+        return $query;
+
+    }
+
+
+    
+
+    /**
+     * @author 吴斌  2018/1/16 创建
+     * 获休息班次，不包含叶修
+     * @param int $scheduleID 计划id
+     * @return object | 对象
+     */
+    public function getRosterRestNoNightConfirm($schedule_id) {
+
+        $query=self::find()
+        ->where(['schedule_id'=>$schedule_id])
+        ->andWhere(['<>','rest_type',0])
+        ->andWhere(['>','shift_type_id',-1])
+        ->asArray()
+        ->all();
+
+        return $query;
+    }
+
+    /**
+     * @author 吴斌  2018/1/16 创建
+     * 获取班次，不包含不上班的数据
+     * @param int $scheduleID 计划id
+     * @return object | 对象
+     */
+    public function getConfrimNoRest($schedule_id) {
+
+        $query=self::find()
+        ->where(['schedule_id'=>$schedule_id])
+        ->andWhere(['>','shift_type_id',0])
+        ->asArray()
+        ->all();
+
+        return $query;
+    }
+
+    /**
+     * @author 吴斌  2018/1/16 创建
+     * 获取不上班的人
+     * @param int $scheduleID 计划id
+     * @return object | 对象
+     */
+    public function getConfrimNoShift($schedule_id) {
+
+        $query=self::find()
+        ->where(['schedule_id'=>$schedule_id])
+        ->andWhere(['<','shift_type_id',1])
+        ->asArray()
+        ->all();
+
+        return $query;
+    }
+
+
+    /**
+     * @author 吴斌  2018/1/16 创建
+     * 获取某天休假的员工
+     * @param int $scheduleID 计划id
+     * @return object | 对象
+     */
+    public function getShiftofEmpNo($schedule_id) {
+
+        $query=self::find()
+        ->where(['schedule_id'=>$schedule_id])
+        ->andWhere(['<>','leave_type',0])
+        ->andWhere(['shift_type_id'=>0])
+        ->asArray()
+        ->all();
+        return $query;
+
+    }
+
+
+    /**
+     * @author 吴斌  2018/4/3 修改 
+     * 获取员工休假日期
+     * @return array $date_format   规范化数组 
+     */
+    public function getLeaveOfEmpByEmpAndDate($emp,$shift_date) {
+
+        $query = (new \yii\db\Query())
+        // ->select(['a.id','a.emp_number','a.shift_index','b.emp_firstname'])
+        ->from('orangehrm_mysql.ohrm_leave a')
+        ->leftJoin('orangehrm_mysql.ohrm_leave_type b','a.leave_type_id = b.id')
+        ->where(['a.emp_number'=>$emp])
+        ->andWhere(['in','a.date',$shift_date])
+        ->andWhere(['>','a.status',1])
+        ->one();
+        return $query;
+    }
+
+
+    /**
+     * @author 吴斌  2018/1/16 创建
+     * 获取员工休假信息
+     * @param int $scheduleID 计划id
+     * @return object | 对象
+     */
+    public function getRosterLeaveDay($schedule_id){
+
+        $LeaveList=array('1','2','3');
+        $query=self::find()
+        ->select(['emp_number','GROUP_CONCAT(shift_date) shiftdate'])
+        ->where(['schedule_id'=>$schedule_id])
+        ->andWhere(['in','leave_type',$LeaveList])
+        ->groupBy(['emp_number'])
+        ->asArray()
+        ->all();
+
+        return $query;
+    }
+
+    /**
+     * @author 吴斌  2018/1/16 创建
+     * 获取员工休假信息
+     * @param int $scheduleID 计划id
+     * @return object | 对象
+     */
+    public function getShiftResultByDate($schedule_id,$shift_date){
+
+        $query=self::find()
+        ->select(['shift_date','shift_type_id','COUNT(shift_type_id) totaltype'])
+        ->where(['schedule_id'=>$schedule_id])
+        ->andWhere(['shift_date'=>$shift_date])
+        ->groupBy(['shift_type_id'])
+        ->asArray()
+        ->all();
+
+        return $query;
+    }
+
+
+
+
+     /**
+     * @author 吴斌  2018/4/3 修改 
+     * 获取员工班次信息
+     * @return array $date_format   规范化数组 
+     */
+    public function getConfrimByEmpAndDate($emp,$shift_date,$schedule_id) {
+        $query = self::find()
+        ->where(['emp_number'=>$emp])
+        ->andWhere(['shift_date'=>$shift_date])
+        ->andWhere(['schedule_id'=>$schedule_id])
+        ->one();
+        return $query;
+    }
+
+    /**
+     * @author 吴斌  2018/4/3 修改 
+     * 删除排班或者休假
+     * @param int $schedule_id 计划ID
+     * @param int $result_id 员工每个排班ID
+     * @param int $add_type 添加类型，1是休息类型，2休假类型
+     * @return array $date_format   规范化数组 
+     */
+
+    public function delShiftOrLeave($schedule_id,$result_id,$add_type){
+        //判断原始结果
+        //判断当天这个班是不是半天班
+        $curmodel=$this->getConfrimResultById($result_id,$schedule_id);
+        $emp_number=$curmodel->emp_number;
+        $shift_date=$curmodel->shift_date;
+      
+       /* $LeaveEntitlementService = new LeaveEntitlement;
+        //删除这一天假期
+        $LeaveEntitlementService->updateLeaveStatus($emp_number,null,0,$shift_date,0,null);*/
+
+        if($add_type==3){//如果是班次变休息
+            $query=self::updateAll(['shift_type_id'=>0,'rest_type'=>1],['id'=>$result_id]);
+        }else if($add_type==2){//如果是休假变休息
+            $query=self::updateAll(['shift_type_id'=>0,'rest_type'=>1,'leave_type'=>0],['id'=>$result_id]);
+        }
+        if($query){
+            return true;
+        }else{
+            return false;
+        }
+    }
+
+    /**
+     * @author 吴斌  2018/4/3 修改 
+     * 添加排班或者休假:班->休息1，班->班3，班->假2： 
+     * @param int $schedule_id 计划ID
+     * @param int $result_id 员工每个排班ID
+     * @param int $add_type 添加类型，1是休息类型，2休假类型
+     * @param int $result_id 传入对应的类型或者休假id
+     * @param int $type_id   类型或者休假id
+     * @return array $date_format   规范化数组 
+     */
+
+    public function updateShiftRest($schedule_id,$result_id,$add_type,$type_id){
+
+        $curshiftype=ShiftType::find()->where(['id'=>$type_id])->one();
+
+        $is_work_half=$curshiftype->is_work_half;
+
+        if($add_type==1){//班换休息
+
+            if($is_work_half==1){//如果半天班->休息
+                $query=self::updateAll(['shift_type_id'=>$type_id,'rest_type'=>2,'leave_type'=>0],['id'=>$result_id]);
+            }else if($is_work_half==0){//全天班->休息
+                $query=self::updateAll(['shift_type_id'=>$type_id,'rest_type'=>0,'leave_type'=>0],['id'=>$result_id]);
+            }
+
+        }else if($add_type==3){//班->班
+            $curmodel=$this->getConfrimResultById($result_id,$schedule_id);
+            $curshiftype2=ShiftType::find()->where(['id'=>$curmodel->shift_type_id])->one();
+            $is_work_half2=$curshiftype2->is_work_half;
+            if($is_work_half==1 && $is_work_half2==1){//如果半天班->半天班
+                $query=self::updateAll(['shift_type_id'=>$type_id],['id'=>$result_id]);
+            }else if($is_work_half==1 && $is_work_half2==0){//半天班->全天班
+                $query=self::updateAll(['shift_type_id'=>$type_id,'rest_type'=>2],['id'=>$result_id]);
+            }else if($is_work_half==0  && $is_work_half2==0){//全天班->全天班
+                $query=self::updateAll(['shift_type_id'=>$type_id],['id'=>$result_id]);
+            } else if($is_work_half==0  && $is_work_half2==1){//全天班->半天班
+                $query=self::updateAll(['shift_type_id'=>$type_id,'rest_type'=>0,'leave_type'=>0],['id'=>$result_id]);
+            }
+        }else if($add_type==2){//班->假
+            if($is_work_half==1){//如果半天班->全天假
+                $query=self::updateAll(['shift_type_id'=>$type_id,'rest_type'=>0,'leave_type'=>2],['id'=>$result_id]);
+            }else if($is_work_half==0){//全天班->全天假
+                $query=self::updateAll(['shift_type_id'=>$type_id,'rest_type'=>0,'leave_type'=>0],['id'=>$result_id]);
+            }
+        }
+
+        if($query){
+            return true;
+        }else{
+            return false;
+        }
+    }
+
+    /**
+     * @author 吴斌  2018/4/3 修改 
+     * 添加休假:3假->班，2假->假，1假->休
+     * @param int $schedule_id 计划ID
+     * @param int $result_id 员工每个排班ID
+     * @param int $add_type 添加类型，1是休息类型，2休假类型
+     * @param int $type_id  休假id
+     * @return array $date_format   规范化数组 
+     */
+
+    public function updateShiftLeave($schedule_id,$result_id,$add_type,$type_id){
+
+        //判断原始结果
+        //判断当天这个班是不是半天班
+        $curmodel=$this->getConfrimResultById($result_id,$schedule_id);
+        $emp_number=$curmodel->emp_number;
+        $shift_date=$curmodel->shift_date;
+        $rest_type=$curmodel->rest_type;
+        $leave_type=$curmodel->leave_type;
+        $leave_type_id=$curmodel->leave_type_id;
+
+        //安排假
+        $LeaveEntitlementService = new LeaveEntitlement;
+    
+        if($add_type==1){//假->休
+
+            $query=self::updateAll(['shift_type_id'=>0,'rest_type'=>0,'leave_type'=>1,'leave_type_id'=>$type_id],['id'=>$result_id]);
+
+            // $LeaveEntitlementService->appointEmployeeLeave($emp_number,$type_id,$shift_date,$shift_date,1);
+
+        }else if($add_type==3){//假->班
+
+            $curshiftype=ShiftType::find()->where(['id'=>$curmodel->shift_type_id])->one();
+            $is_work_half=$curshiftype->is_work_half;
+            if($is_work_half==1 && $rest_type==2){//假->班/休：班/假
+                $query=self::updateAll(['rest_type'=>0,'leave_type'=>2,'leave_type_id'=>$type_id],['id'=>$result_id]);
+                // $LeaveEntitlementService->appointEmployeeLeave($emp_number,$type_id,$shift_date,$shift_date,1);
+            }else if($is_work_half==1 && $leave_type==2){//假->班/假：班/假
+                $query=self::updateAll(['rest_type'=>0,'leave_type'=>2,'leave_type_id'=>$type_id],['id'=>$result_id]);
+                // 删除这一天假期
+                // $LeaveEntitlementService->updateLeaveStatus($emp_number,null,0,$shift_date,0,null);
+                // 重新派假
+                // $LeaveEntitlementService->appointEmployeeLeave($emp_number,$type_id,$shift_date,$shift_date,1);
+            }else if($is_work_half==0 ){//假->全班: 假
+
+                // $LeaveEntitlementService->appointEmployeeLeave($emp_number,$type_id,$shift_date,$shift_date,1);
+                $query=self::updateAll(['shift_type_id'=>0,'rest_type'=>0,'leave_type'=>1,'leave_type_id'=>$type_id],['id'=>$result_id]);
+                
+            } 
+        }else if($add_type==2){//假->假
+           
+            
+            //删除这一天假期
+            // $LeaveEntitlementService->updateLeaveStatus($emp_number,null,0,$shift_date,0,null);
+            //重新派假
+            // $LeaveEntitlementService->appointEmployeeLeave($emp_number,$type_id,$shift_date,$shift_date,1);
+
+            $query=self::updateAll(['shift_type_id'=>0,'rest_type'=>0,'leave_type'=>1,'leave_type_id'=>$type_id],['id'=>$result_id]);
+            
+        }
+
+    
+        if($query){
+            return true;
+        }else{
+            return false;
+        }
+    }
+
+    /**
+     * @author 吴斌  2018/4/3 修改 
+     * 获取员工班次
+     * @param int $schedule_id 计划ID
+     * @param int $id 员工每个排班ID
+     * @return array $date_format   规范化数组 
+     */
+
+    public function getConfrimResultById($id,$schedule_id){
+        
+        $query=self::find()
+            ->where(['id'=>$id])
+            ->andWhere(['schedule_id'=>$schedule_id])
+            ->one();
+
+        return $query;
+    }
+
+    /**
+     * @author 吴斌  2018/4/3 修改 
+     * 更改班次所属员工
+     * @param int $emp 员工工资号
+     * @param int $id 员工每个排班ID
+     * @return array $date_format   规范化数组 
+     */
+
+    public function updateResultEmp($id,$emp){
+
+       
+        $query=self::updateAll(['emp_number'=>$emp],['id'=>$id]);
+        if($query){
+            return true;
+        }else{
+            return false;
+        }
+    }
+
+    /**
+     * @author 吴斌  2018/4/3 修改 
+     * 获取某些员工时间段内所有班次
+     * @param int $schedule_id 计划ID
+     * @param int $emps 员工组
+     * @param int $shift_dates 日期组
+     * @return array $date_format   规范化数组 
+     */
+    public function getShiftResultByContions($schedule_id,$emps,$shift_dates){
+
+        $query=self::find()->where(['schedule_id'=>$schedule_id])
+            ->andWhere(['in' , 'emp_number' , $emps])
+            ->andWhere(['in' , 'shift_date' , $shift_dates])
+            ->asArray()
+            ->all();
+        return $query;
+    }
+     /**
+     * @author 吴斌  2018/4/3 修改 
+     * 删除某些员工时间段内所有班次
+     * @param int $schedule_id 计划ID
+     * @param int $emps 员工组
+     * @param int $shift_dates 日期组
+     * @return array $date_format   规范化数组 
+     */
+    public function delShiftResultByContions($schedule_id,$emps,$shift_dates){
+
+        $query=self::deleteAll([ 'and', 'schedule_id = :schedule_id', ['in', 'emp_number', $emps],['in', 'shift_date', $shift_dates]],[ ':schedule_id' => $schedule_id ]);
+
+        return $query;
+    }
+
+    /**
+     * @author 吴斌  2018/4/3 修改 
+     * 发布排班表前的一些操作
+     * @param int $schedule_id 计划ID
+     * @param int $emps 员工组
+     * @param int $shift_dates 日期组
+     * @return array $date_format   规范化数组 
+     */
+    public function publicShiftVerify($scheduleID,$workStation,$confrim_result){
+
+        $typemodel=new ShiftType;
+        $orderbymode=new ShiftOrderBy;
+        $empmodel=new Employee;
+        $shiftdatemodel=new ShiftDate;
+
+        $shiftTypes=$typemodel->getShifType($workStation);
+        $shiftTypes = array_column($shiftTypes, NULL, 'id');
+        $leave_note='发布排班表时自动操作';
+
+        //获取班次和假期冲突的员工和日期
+        $LeaveEntitlementService = new LeaveEntitlement;
+
+        foreach ($confrim_result as $key_confrim => $value_confrim) {
+          $emp_number=$value_confrim['emp_number'];
+          $shift_date=$value_confrim['shift_date'];
+          $shift_type=$value_confrim['shift_type_id'];
+          $rest_type=$value_confrim['rest_type'];
+          $if_have_leave=$this->getLeaveOfEmpByEmpAndDate($emp_number,$shift_date);
+
+          $is_half_type=isset($shiftTypes[$shift_type]) ? $shiftTypes[$shift_type]['is_work_half']:'';
+          $leave_type = $if_have_leave['duration_type'];//'0：1天；1上午；2下午'
+          
+          //根据日期和员工编号查询是否班次和假期冲突
+          if($value_confrim['shift_type_id']>0){
+
+
+              //全天班，有假期，销假
+              if($is_half_type==0 && $leave_type==0 ){
+                $LeaveEntitlementService->updateLeaveStatus($emp_number,$id=null,$queryType=0,$shift_date,0,$leave_note);
+              }else if($is_half_type==0 && $leave_type==1){
+                $LeaveEntitlementService->updateLeaveStatus($emp_number,$id=null,$queryType=0,$shift_date,1,$leave_note);
+              }else if($is_half_type==0 && $leave_type==2){
+                $LeaveEntitlementService->updateLeaveStatus($emp_number,$id=null,$queryType=0,$shift_date,2,$leave_note);
+              }else if($is_half_type==1 && $leave_type==0){
+                $LeaveEntitlementService->updateLeaveStatus($emp_number,$id=null,$queryType=0,$shift_date,0,$leave_note);
+
+              }  
+          }
+          
+        }
+  
+        //获取所有班次的empmumber
+        $all_shift_emp=$orderbymode->getShiftOrderBy($scheduleID);
+        $all_shift_emp=array_column($all_shift_emp, 'emp_number');
+
+
+        //获取休息的人多信息
+        $rest= $this->getRosterRestNoNightConfirm($scheduleID);
+        $rest_number=array_unique(array_column($rest, 'emp_number'));
+
+        //一周七天都在上班的人=全部班次人-七天中有休息的人（不包含夜休）
+        $no_rest_emp=array_diff($all_shift_emp, $rest_number);
+      
+        //获取要休假的员工
+        $leave=array();
+        $leave=$this->getShiftofEmpNo($scheduleID);
+
+
+
+        $leave_week=array();
+        $tmp4=array();
+        $leave_combine=array();
+        $total_leave_day=array();
+
+        $total_rest_day=array();
+
+        if(isset($leave)){
+            foreach ($leave as $k4 => $v4) {
+                $tmp_emp=$v4['emp_number'];
+
+                $tmp4[$tmp_emp][$k4]=$v4;
+            }
+        }
+        
+
+            
+         //获取七天全是休假的人员
+        if(isset($tmp4)){
+            foreach ($tmp4 as $k5 => $v5) {
+                 if(count($v5)==7){
+                    $leave_week[]=$k5;
+                 }
+             }
+        }
+         
+
+         //全是休假的人，如果休息天数不够，是不安排补休；所以将全是休假的人剔除；
+        if(isset($rest_combine)){
+            foreach ($rest_combine as $k6 => $v6) {
+                 if(in_array($v6, $leave_week)){
+                    unset($no_rest_emp[$k6]);
+                 }
+            }
+        }
+         
+        if(isset($rest_combine)){
+            foreach ($rest_combine as $rest_key => $rest_value) {
+                $emp_number=$rest_value['emp_number'];
+                $rest_combine[$emp_number][$rest_key]=$rest_value;
+            }
+         }
+
+        //计算每个员工总共休息天
+        if(isset($rest_combine)){
+            foreach ($rest_combine as $ck => $cv) {
+                $cv=array_column($cv, 'rest_type');
+                foreach ($cv as $k1 => $v1) {
+                   if($v1==2){
+                     $h[$ck][$k1]=0.5;
+                    
+                   }else if($v1==1){
+                     $h[$ck][$k1]=1;
+                   }
+                }
+               
+                $total_rest_day[$ck]=array_sum($h[$ck]);
+            }
+        }
+        
+        if(isset($leave)){
+            foreach ($leave as $k7 => $v7) {
+              $emp_number=$v7['emp_number'];
+              $leave_combine[$emp_number][$k7]=$v7;
+            }
+
+        }
+        
+        //计算每个员工总共休假天
+        if(isset($leave_combine)){
+            foreach ($leave_combine as $k8 => $cl) {
+                $cl=array_column($cl, 'leave_type');
+                foreach ($cl as $k1 => $v1) {
+                   if($v1==2){
+                     $h2[$k8][$k1]=0.5;
+                   }else if($v1==1){
+
+                     $h2[$k8][$k1]=1;
+                   }
+                }
+               
+                $total_leave_day[$k8]=array_sum($h2[$k8]);
+            }
+        }
+        
+
+        //员工起晚派假的日期
+        $leaveDays=$this->getRosterLeaveDay($scheduleID);
+
+      
+        $leaveDays=array_column($leaveDays, 'shiftdate','emp_number');
+       
+        //每个员工已经用的假期
+        $usedLeave=array();
+        $usedLeave=$LeaveEntitlementService->getAlreadyUsedLeave($leaveDays);
+
+
+        $employee=$empmodel->getEmpByWorkStation($workStation);
+
+
+        $employee=array_column($employee,null, 'emp_number');
+
+        //获取排班日期
+        $shiftDate=$shiftdatemodel->getDatesBySchedule($scheduleID);
+
+        $shiftDate=array_column($shiftDate, 'shift_date');
+        $firstDate=current($shiftDate);
+        $lastDate=end($shiftDate);
+          
+        $tmpCanTo=array();
+        
+        if(isset($total_leave_day)){
+            foreach ($total_leave_day as $key_last => $value_last) {
+                //获取每个员工实际派假=期望派假-已用派
+                $canuseLeave=$value_last-$usedLeave[$key_last];
+                //余假池还剩多少假期
+                $orange_total_leavel= $LeaveEntitlementService->getEntitlementSurplusDay($key_last,'',$firstDate,$lastDate,1);
+                $shoulePai=$canuseLeave-$orange_total_leavel;
+                //如果实际需要的派假数大于可用的天数
+                if($canuseLeave>$orange_total_leavel){
+                    $name=$employee[$key_last]['emp_firstname'];
+                    $tmpCanTo[$key_last]=$name.'总共派假'.$value_last.'天;实际已派'.$usedLeave[$key_last].'天;实际还需派假'.$canuseLeave.'天;  余假池还剩'. $orange_total_leavel;
+                }
+            }
+        }
+
+        if(isset($tmpCanTo)&&count($tmpCanTo)>0){
+            $result['status']=false;
+            $result['message']=implode("; \n",$tmpCanTo);
+            return $result;
+        }
+
+        //给一周没有安排休的人安排两天加班调休
+        if(isset($no_rest_emp)&&count($no_rest_emp)>0){
+            foreach ($no_rest_emp as $k3 => $v3) {
+                $LeaveEntitlementService->changeEntitlementDays($v3,+2,'',$leave_note);
+            }
+        }
+        if(isset($total_rest_day)&&count($total_rest_day)>0){
+            foreach ($total_rest_day as $k2 => $v2) {
+                $short_day=$v2-2;
+                if($short_day<0){//如果休息天小于两天，自动增加加班天休假
+                    //所需要增加的天数
+                    $add='+'.abs($short_day);
+                    $LeaveEntitlementService->changeEntitlementDays($k2,$add,'',$leave_note);
+                }
+            }
+        }
+        
+        if(isset($leave)&&count($leave)>0){
+            foreach ($leave as $k => $v) {
+              if($v['leave_type']==1){
+                  $ishalf=0;
+                  
+              }else{
+                  $ishalf=2;
+              }
+
+              $LeaveEntitlementService->appointEmployeeLeave($v['emp_number'],'',$v['shift_date'],$v['shift_date'],$ishalf);
+            }
+        }
+
+        $result['status']=true;
+        $result['message']='';
+        return $result;
+        
+
+    }
+
+}

@@ -1,0 +1,677 @@
+<?php
+namespace frontend\controllers\v1;
+
+use Yii;
+use yii\web\Response;
+use yii\helpers\Url;
+use yii\web\Controller;
+use common\models\shift\Skill;
+use common\models\shift\EmpSkill;
+class SkillController extends \common\rest\Controller
+{
+    /**
+     *  
+     * @var string
+     */
+    public $modelClass = 'common\models\Skill';
+
+    /**
+     * 
+     * @var array
+     */
+    public $serializer = [
+        'class' => 'common\rest\Serializer',    // 返回格式数据化字段
+        'collectionEnvelope' => 'result',       // 制定数据字段名称
+        'message' => 'OK',                      // 文本提示
+        'errno'   => 0,
+        'status'  =>''
+    ];
+
+
+    /**
+     * @param  [action] yii\rest\IndexAction
+     * @return [type] 
+     */
+    public function beforeAction($action)
+    {
+        $format = \Yii::$app->getRequest()->getQueryParam('format', 'json');
+
+        if($format == 'xml'){
+            \Yii::$app->response->format = \yii\web\Response::FORMAT_XML;
+        }else{
+            \Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+        }
+
+        return $action;
+    }
+
+    /**
+     * @param  [type]
+     * @param  [type]
+     * @return [type]
+     */
+    public function afterAction($action, $result){
+        $result = parent::afterAction($action, $result);
+
+        return $result;
+    }
+
+    public function behaviors()
+    {
+        $behaviors = parent::behaviors();
+        $behaviors['contentNegotiator']['formats']['text/html'] = Response::FORMAT_HTML;
+        return $behaviors;
+    }
+
+    public function actions()
+    {
+        $actions = parent::actions();
+        unset($actions['index']);
+        return $actions;
+    }
+
+
+
+    /**
+     * @SWG\Post(path="/skill/skill-list-page",
+     *     tags={"云平台-Skill-技能"},
+     *     summary="查询技能分页",
+     *     description="查询技能分页",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "page",
+     *        description = "page",
+     *        required = false,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回技能类型列表"
+     *     ),
+     * )
+     *
+    **/
+    public function actionSkillListPage()
+    {
+        $post=Yii::$app->request->post();
+        $skillmodel=new Skill;
+        $work_station=$this->workStation;
+
+        $page=isset($post['page'])?$post['page']:0; 
+        $pageSize = Yii::$app->params['pageSize']['shift'];
+
+        $skillList=$skillmodel->getSkillListPage($work_station,$page,$pageSize);
+        $data=array();
+        $data_tmp=array();
+        if(isset($skillList['data'])){
+            foreach ($skillList['data'] as $key => $value) {
+                $data_tmp[$key]=$value;
+                $data_tmp[$key]['id']=(string)$value['id'];
+                $data_tmp[$key]['work_station']==(string)$value['work_station'];
+            }
+            $data['totalCount']=(int)$skillList['totalCount'];
+            $data['pageSize']=(int)$pageSize;
+            $data['current_page']=(int)$page;
+            $data['data']=$data_tmp;
+        }
+       
+
+        if(count($data)>0){
+
+            $this->serializer['errno']   = 0;
+            $this->serializer['status']   = true;
+            $this->serializer['message'] = "获取成功";
+
+            return $data;
+    
+        }else{
+           
+            $this->serializer['errno']   = 200006000;
+            $this->serializer['status']   = false;
+            $this->serializer['message'] = "没有技能信息";
+        }
+    }
+
+    /**
+     * @SWG\Post(path="/skill/skill-list",
+     *     tags={"云平台-Skill-技能"},
+     *     summary="查询技能",
+     *     description="查询技能",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回技能类型列表"
+     *     ),
+     * )
+     *
+    **/
+    public function actionSkillList()
+    {
+        $post=Yii::$app->request->post();
+        $skillmodel=new Skill;
+        $work_station=$this->workStation;
+        $skillList=$skillmodel->getSkillList($work_station);
+        $data=array();
+        foreach ($skillList as $key => $value) {
+            $data[$key]=$value;
+            $data[$key]['id']=(string)$value['id'];
+            $data[$key]['work_station']==(string)$value['work_station'];
+        }
+
+        if(count($data)>0){
+
+            $this->serializer['errno']   = 0;
+            $this->serializer['status']   = true;
+            $this->serializer['message'] = "获取成功";
+
+            return $data;
+    
+        }else{
+           
+            $this->serializer['errno']   = 200006000;
+            $this->serializer['status']   = false;
+            $this->serializer['message'] = "没有技能信息";
+        }
+    }
+
+    /**
+     * @SWG\Post(path="/skill/create",
+     *     tags={"云平台-Skill-技能"},
+     *     summary="添加技能",
+     *     description="添加技能",
+     *     produces={"application/json"},
+
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "name",
+     *        description = "技能名称",
+     *        required = true,
+     *        type = "string",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "description",
+     *        description = "技能描述",
+     *        required = false,
+     *        type = "string",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "token",
+     *        required = false,
+     *        type = "string",
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回技能类型列表"
+     *     ),
+     * )
+     *
+    **/
+    public function actionCreate()
+    {
+        $isLeader=$this->isLeader;
+        if(!$isLeader){
+            $this->serializer['errno']   = '422';
+            $this->serializer['status']   = false;
+            $this->serializer['message'] = '权限不够，只有组长及副组长权限可以';
+            return [];
+        }
+        $post=Yii::$app->request->post();
+        $skillmodel=new Skill;
+        $work_station=$this->workStation;
+
+
+        $data['Skill']['name']=$post['name'];
+        $data['Skill']['work_station']=$work_station;
+        $data['Skill']['description']=$post['description'];
+
+        if($skillmodel->add($data)){
+            $this->serializer['errno']   = 0;
+            $this->serializer['status']   = true;
+            $this->serializer['message'] = "创建成功";
+
+        }else{
+            $this->serializer['errno']   = 200006000;
+            $this->serializer['status']   = false;
+            $this->serializer['message'] = "创建失败";
+        }
+    }
+    /**
+     * @SWG\Post(path="/skill/update",
+     *     tags={"云平台-Skill-技能"},
+     *     summary="修改技能",
+     *     description="修改技能",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "token",
+     *        required = false,
+     *        type = "string",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "skill_id",
+     *        description = "技能id",
+     *        required = false,
+     *        type = "string",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "name",
+     *        description = "技能名称",
+     *        required = true,
+     *        type = "string",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "description",
+     *        description = "技能描述",
+     *        required = false,
+     *        type = "string",
+     *     ),
+
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回技能类型列表"
+     *     ),
+     * )
+     *
+    **/
+    public function actionUpdate()
+    {
+        $isLeader=$this->isLeader;
+        if(!$isLeader){
+            $this->serializer['errno']   = '422';
+            $this->serializer['status']   = false;
+            $this->serializer['message'] = '权限不够，只有组长及副组长权限可以';
+            return [];
+        }
+        $post=Yii::$app->request->post();
+
+        if(Skill::updateAll(['name' => $post['name'], 'description' => $post['description']], 'id = :id', [':id' =>$post['skill_id']])){
+            $this->serializer['errno']   = 0;
+            $this->serializer['status']   = true;
+            $this->serializer['message'] = "修改成功";
+
+        }else{
+            $this->serializer['errno']   = 200006000;
+            $this->serializer['status']   = false;
+            $this->serializer['message'] = "修改失败";
+        }
+    }
+
+    /**
+     * @SWG\Post(path="/skill/emp-skill",
+     *     tags={"云平台-Skill-技能"},
+     *     summary="员工绑定技能",
+     *     description="员工绑定技能",
+     *     produces={"application/json"},
+
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "string",
+     *     ),
+
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "skill_id",
+     *        description = "技能id,格式[1,2]",
+     *        required = true,
+     *        type = "string",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "emp_number",
+     *        description = "员工编号",
+     *        required = true,
+     *        type = "string",
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回技能类型列表"
+     *     ),
+     * )
+     *
+    **/
+    public function actionEmpSkill()
+    {
+
+        $post=Yii::$app->request->post();
+        $work_station=$this->workStation;
+        $require_skill=array();
+        $require_skill=json_decode($post['skill_id']);
+        //判断该员工是否包含该技能，如果有的话就不用添加
+        $empskillmodel=new EmpSkill;
+        $skills=EmpSkill::find()
+                ->select('id,skill_id')
+                ->andWhere('emp_number=:enm',[':enm'=>$post['emp_number']])
+                ->asArray()
+                ->all();
+    
+        $idList=array();
+        $skillList=array();
+        
+        //如果第一个有的第二个没有，则删除
+        foreach ($skills as $key => $skill) {
+            $skillid=$skill['skill_id'];
+            if(!in_array($skillid, $require_skill)){
+                $del_model=EmpSkill::find()->select('id,skill_id')->where('id=:id',[':id'=>$skill['id']])->one();
+                $del_model->delete();
+            }else{
+                $idList[$key] = $skillid;
+            }
+        }
+        
+        if(count($idList)>count($require_skill)){
+            $skillList = array_diff($idList,$require_skill); 
+        }else{
+            $skillList = array_diff($require_skill,$idList); 
+        }
+
+
+        foreach ($skillList as $key => $skill) {
+
+            $empskillmodel=new EmpSkill;
+            $data['EmpSkill']['skill_id']=$skill;
+            $data['EmpSkill']['work_station']=$work_station;
+            $data['EmpSkill']['emp_number']=$post['emp_number'];
+            if(!$empskillmodel->add($data)){
+                $this->serializer['errno']   = 20006000;
+                $this->serializer['status']   = false;
+                $this->serializer['message'] = "创建失败";
+                return;
+
+            }
+        }
+        $this->serializer['errno']   = 0;
+        $this->serializer['status']   = true;
+        $this->serializer['message'] = "创建成功";
+        
+    }
+
+
+    /**
+     * @SWG\Post(path="/skill/emp-skill-page",
+     *     tags={"云平台-Skill-技能"},
+     *     summary="获取员工技能列表",
+     *     description="获取员工技能列表",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "page",
+     *        description = "page",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回技能类型列表"
+     *     ),
+     * )
+     *
+    **/
+    public function actionEmpSkillPage()
+    {
+        $post=Yii::$app->request->post();
+        $skillmodel=new EmpSkill;
+        $work_station=$this->workStation;
+
+        $page=isset($post['page'])?$post['page']:'0';
+        $pageSize = Yii::$app->params['pageSize']['shift'];
+
+        $data=array();
+        $new_emp=array();
+        $new_emp_skill=array();
+
+        //获取员工技能列表
+        $skillList=$skillmodel->getEmpSkillListPage($work_station,$page,$pageSize);
+
+        foreach ($skillList['data'] as $key => $emskill) {
+            $emp_number=$emskill['emp_number'];
+            $data[$emp_number]['emp_number']=$emp_number;
+            $data[$emp_number]['emp_name']=$emskill['emp_firstname'];
+            $data[$emp_number]['emp_skill'][$key]['skill_id']=empty($emskill['skill_id'])?'':$emskill['skill_id'];
+            $data[$emp_number]['emp_skill'][$key]['skill_name']=empty($emskill['name'])?'':$emskill['name'];
+
+        }
+
+        $data=array_values($data);
+
+        foreach ($data as $k => $new_data) {
+            $new_emp[$k]=$new_data;
+            $new_emp[$k]['emp_skill']=array_values($new_data['emp_skill']);
+        }
+
+
+        $new_emp_skill['totalCount']=(int)$skillList['totalCount'];
+        $new_emp_skill['pageSize']=(int)$pageSize;
+        $new_emp_skill['current_page']=(int)$page;
+        $new_emp_skill['data']=$new_emp;
+
+        if(count($new_emp_skill)>0){
+
+            $this->serializer['errno']   = 0;
+            $this->serializer['status']   = true;
+            $this->serializer['message'] = "获取成功";
+            return $new_emp_skill;
+  
+        }else{
+            $this->serializer['errno']   = 0;
+            $this->serializer['status']   = false;
+            $this->serializer['message'] = "获取失败";
+        }
+    }
+
+     /**
+     * @SWG\Post(path="/skill/emp-skill-list",
+     *     tags={"云平台-Skill-技能"},
+     *     summary="获取员工技能列表",
+     *     description="获取员工技能列表",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回技能类型列表"
+     *     ),
+     * )
+     *
+    **/
+    public function actionEmpSkillList()
+    {
+        $post=Yii::$app->request->post();
+        $skillmodel=new EmpSkill;
+        $work_station=$this->workStation;
+        //获取员工技能列表
+        $skillList=$skillmodel->getEmpSkillList($work_station);
+       
+
+        foreach ($skillList as $key => $emskill) {
+
+            
+            $emp_number=$emskill['emp_number'];
+            $data[$emp_number]['emp_number']=$emp_number;
+            $data[$emp_number]['emp_name']=$emskill['emp_firstname'];
+            $data[$emp_number]['emp_skill'][$key]['skill_id']=empty($emskill['skill_id'])?'':$emskill['skill_id'];
+            $data[$emp_number]['emp_skill'][$key]['skill_name']=empty($emskill['name'])?'':$emskill['name'];
+
+        }
+        $data=array_values($data);
+        foreach ($data as $k => $new_data) {
+            $new_emp_skill[$k]=$new_data;
+            $new_emp_skill[$k]['emp_skill']=array_values($new_data['emp_skill']);
+        }
+ 
+
+        if(count($new_emp_skill)>0){
+
+            $this->serializer['errno']   = 0;
+            $this->serializer['status']   = true;
+            $this->serializer['message'] = "获取成功";
+            return $new_emp_skill;
+  
+        }else{
+            $this->serializer['errno']   = 0;
+            $this->serializer['status']   = false;
+            $this->serializer['message'] = "获取失败";
+        }
+    }
+
+
+    /**
+     * @SWG\Post(path="/skill/emp-skill-del",
+     *     tags={"云平台-Skill-技能"},
+     *     summary="删除员工技能",
+     *     description="删除员工技能",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "skill_id",
+     *        description = "技能id",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "emp_number",
+     *        description = "员工id",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回技能类型列表"
+     *     ),
+     * )
+     *
+    **/
+    public function actionEmpSkillDel()
+    {
+        $isLeader=$this->isLeader;
+        if(!$isLeader){
+            $this->serializer['errno']   = '422';
+            $this->serializer['status']   = false;
+            $this->serializer['message'] = '权限不够，只有组长及副组长权限可以';
+            return [];
+        }
+
+        $post=Yii::$app->request->post();
+        $skillmodel=new EmpSkill;
+        $work_station=$this->workStation;
+        //获取员工技能列表
+        $delmodel=$skillmodel->delEmpSkillList($post['emp_number'],$post['skill_id']);
+        if($delmodel){
+
+            $this->serializer['errno']   = 0;
+            $this->serializer['status']   = true;
+            $this->serializer['message'] = "删除成功";
+           
+        }else{
+            $this->serializer['errno']   = 0;
+            $this->serializer['status']   = false;
+            $this->serializer['message'] = "删除失败";
+        }
+    }
+
+
+     /**
+     * @SWG\Post(path="/skill/delete",
+     *     tags={"云平台-Skill-技能"},
+     *     summary="删除技能",
+     *     description="删除技能",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "skill_id",
+     *        description = "技能类型ID,格式[1,2,3]",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回班次类型列表"
+     *     ),
+     * )
+     *
+    **/
+    public function actionDelete()
+    {
+        $isLeader=$this->isLeader;
+        if(!$isLeader){
+            $this->serializer['errno']   = '422';
+            $this->serializer['status']   = false;
+            $this->serializer['message'] = '权限不够，只有组长及副组长权限可以';
+            return [];
+        }
+
+        $post=Yii::$app->request->post();
+        
+        $skillmodel=new Skill;
+        $skill_list=json_decode($post['skill_id']);
+
+        
+        try{
+            foreach ($skill_list as $key => $skill_id) {
+                $query=$skillmodel::deleteAll(['id'=>$skill_id]);
+            }
+            $this->serializer['errno']   = 0;
+            $this->serializer['status']   = true;
+            $this->serializer['message'] = "删除成功"; 
+
+        }catch(\Exception $e) {
+            $this->serializer['errno']   = 0;
+            $this->serializer['status']   = false;
+            $this->serializer['message'] = "删除失败"; 
+        }
+    }
+
+}
+
+?>

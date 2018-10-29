@@ -1,0 +1,75 @@
+<?php
+
+namespace common\models;
+
+use Yii;
+use \common\models\base\LeaveRequest as BaseLeaveRequest;
+use yii\helpers\ArrayHelper;
+
+/**
+ * This is the model class for table "ohrm_leave_request".
+ */
+class LeaveRequest extends BaseLeaveRequest
+{
+
+    public function behaviors()
+    {
+        return ArrayHelper::merge(
+            parent::behaviors(),
+            [
+                # custom behaviors
+            ]
+        );
+    }
+
+    public function rules()
+    {
+        return ArrayHelper::merge(
+            parent::rules(),
+            [
+                # custom validation rules
+            ]
+        );
+    }
+
+    public function judgeLeaveIsUsedmore($employeeId, $leaveTypeId, $date,$ishalf=0) {
+
+        $Leave = new Leave();
+        $Leave->_markApprovedLeaveAsTaken();
+
+
+        $query = Leave::find();
+        $query->where('emp_number = :employeeId',[':employeeId' => $employeeId]);
+
+        if($leaveTypeId){
+            $query->andWhere('leave_type_id = :leaveTypeId',[':leaveTypeId' => $leaveTypeId]);
+        }
+        if($date){
+            $query->andWhere('date = :date',[':date' => $date]);
+        }
+        if($ishalf){
+            $query->andWhere('duration_type = :ishalf',[':ishalf' => $ishalf]);
+        }
+
+        $query->andWhere('status > 0');     
+        $record = $query->all();
+
+
+        if(empty($record)){
+            return null;
+        }
+        return $record;
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+}

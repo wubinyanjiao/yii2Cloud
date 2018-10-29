@@ -1,0 +1,115 @@
+<?php
+
+namespace common\models\performance;
+
+use Yii;
+use \common\models\performance\base\BonusCalculationManage as BaseBonusCalculationManage;
+use yii\helpers\ArrayHelper;
+
+/**
+ * This is the model class for table "ohrm_bonus_calculation_manage".
+ */
+class BonusCalculationManage extends BaseBonusCalculationManage
+{
+
+    public function behaviors()
+    {
+        return ArrayHelper::merge(
+            parent::behaviors(),
+            [
+                # custom behaviors
+            ]
+        );
+    }
+
+    public function rules()
+    {
+        return ArrayHelper::merge(
+            parent::rules(),
+            [
+                # custom validation rules
+            ]
+        );
+    }
+
+    public function getBonusCalculationManageSearch($search){
+        $subunit = !empty($search['subunit'])?$search['subunit']:null;
+        $status = !empty($search['status'])?$search['status']:null;
+        $year = !empty($search['year'])?$search['year']:null;
+        $customerId = $search['customerId'];
+
+        $limit = $search['limit'];   //每页数 20
+        $offset = $search['offset'];   //每页数 20
+
+
+        $query = self::find();
+        $query->where('customerId = :customerId',[':customerId'=>$customerId]);
+        if($subunit){
+            if(is_array($subunit)){
+                $query->andWhere(['in','groupId',$subunit]);
+            }else{
+                $query->andWhere('groupId = :groupId',[':groupId'=>$groupId]);
+            }
+        }
+        if($status){
+            if(is_array($status)){
+                $query->andWhere(['in','status',$status]);
+            }else{
+                $query->andWhere('status = :status',[':status'=>$status]);
+            }
+        }
+        if($year){
+            if(is_array($year)){
+                $query->andWhere(['in','bonusDate',$year]);
+            }else{
+                $query->andWhere('bonusDate = :bonusDate',[':bonusDate'=>$year]);
+            }
+        }
+
+        $count = $query->count();
+        $query->orderBy('bonusDate desc');
+
+        $query->offset($offset);
+        $query->limit($limit);
+        $list = $query->all();
+        //$sql=$query ->createCommand()->getRawSql(); 
+        //var_dump($sql);die;   
+
+        return array('list'=>$list,'count'=>$count);
+        
+    }
+    public function getBonusCalculationManage($customerId = null,$date = null,$groupId = null){
+        $query = self::find();
+        if($customerId){
+            $query->andWhere('customerId = :customerId',[':customerId' => $customerId]);
+        }
+        if($date){
+            $query->andWhere('bonusDate = :date',[':date' => $date]);
+        }
+        if($groupId){
+            $query->andWhere('groupId = :groupId',[':groupId' => $groupId]);
+        }
+        
+        $list  = $query->one();
+        return $list;
+    }
+    public function getBonusCalculationManageById($id ){
+        $query = self::find();
+        
+        $query->andWhere('id = :id',[':id' => $id]);
+        
+        $list  = $query->one();
+        return $list;
+    }
+    public function getBonusCalculationManageBySub($date,$workStation){
+        $query = self::find();
+        $query->where('bonusDate = :date',[':date' => $date]);
+        $query->andWhere('groupId = :workStation',[':workStation' => $workStation]);
+        
+        $list  = $query->one();
+        return $list;
+    }
+    
+
+   
+}

@@ -1,0 +1,595 @@
+<?php
+namespace frontend\controllers\v1;
+
+use Yii;
+use yii\web\Response;
+use yii\helpers\Url;
+use yii\web\Controller;
+use yii\helpers\ArrayHelper;
+use common\models\education\Education;
+
+
+class EducationController extends \common\rest\Controller
+{
+    /**
+     * @var string
+     */
+    public $modelClass = 'common\models\education\Education';
+
+    /**
+     *
+     * @var array
+     */
+    public $serializer = [
+        'class' => 'common\rest\Serializer',    // 返回格式数据化字段
+        'collectionEnvelope' => 'result',       // 制定数据字段名称
+        'message' => 'OK',                      // 文本提示
+    ];
+
+
+
+    /**
+     * @param  [action] yii\rest\IndexAction
+     * @return [type]
+     */
+    public function beforeAction($action)
+    {
+        $format = \Yii::$app->getRequest()->getQueryParam('format', 'json');
+
+        if($format == 'xml'){
+            Yii::$app->response->format = yii\web\Response::FORMAT_XML;
+        }else{
+            Yii::$app->response->format = yii\web\Response::FORMAT_JSON;
+        }
+
+        return $action;
+    }
+
+    /**
+     * @param  [type]
+     * @param  [type]
+     * @return [type]
+     */
+    public function afterAction($action, $result){
+        $result = parent::afterAction($action, $result);
+
+        return $result;
+    }
+
+    public function behaviors()
+    {
+        $behaviors = parent::behaviors();
+        $behaviors['contentNegotiator']['formats']['text/html'] = Response::FORMAT_HTML;
+        return $behaviors;
+    }
+
+    public function actions()
+    {
+        $actions = parent::actions();
+        unset($actions['index']);
+        return $actions;
+    }
+
+
+
+    /**
+     * @SWG\Post(path="/education/add-education",
+     *     tags={"云平台-Education-教学"},
+     *     summary="添加教学",
+     *     description="添加教学",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "emp_number",
+     *        description = "带教人id",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "student",
+     *        description = "学生姓名",
+     *        required = true,
+     *        type = "string"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "type_id",
+     *        description = "学生类别id",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "start_time",
+     *        description = "带教开始时间",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "end_time",
+     *        description = "带教结束时间",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "content",
+     *        description = "带教内容",
+     *        required = true,
+     *        type = "string",
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回教学列表"
+     *     ),
+     *     @SWG\Response(
+     *         response = 403,
+     *         description = "添加失败失败",
+     *     )
+     * )
+     *
+     **/
+    public function actionAddEducation(){
+         $data = yii::$app->request->post();
+         $education = new Education();
+         $model = $education->addeducation($data);
+         if ($model == false){
+             $this->serializer['message'] = '学生姓名不存在';
+             $this->serializer['status'] = false;
+             return false;
+         }else{
+            return $model;
+         }
+    }
+
+
+
+    /**
+     * @SWG\Post(path="/education/add",
+     *     tags={"云平台-Education-教学"},
+     *     summary="管理员添加教学",
+     *     description="管理员添加教学",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "name",
+     *        description = "带教人",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "student",
+     *        description = "学生姓名",
+     *        required = true,
+     *        type = "string"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "type_id",
+     *        description = "学生类别id",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "start_time",
+     *        description = "带教开始时间",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "end_time",
+     *        description = "带教结束时间",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "content",
+     *        description = "带教内容",
+     *        required = true,
+     *        type = "string",
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回教学列表"
+     *     ),
+     *     @SWG\Response(
+     *         response = 403,
+     *         description = "添加失败失败",
+     *     )
+     * )
+     *
+     **/
+    public function actionAdd(){
+        $data = yii::$app->request->post();
+        $education = new Education();
+        $model = $education->add($data);
+        if ($model == false){
+            $this->serializer['message'] = '学生或老师姓名不存在';
+            $this->serializer['status'] = false;
+            return false;
+        }else{
+            return $model;
+        }
+    }
+
+
+    /**
+     * @SWG\Post(path="/education/education-type",
+     *     tags={"云平台-Education-教学"},
+     *     summary="教学类别",
+     *     description="教学类别",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回教学列表"
+     *     ),
+     *     @SWG\Response(
+     *         response = 403,
+     *         description = "查询失败",
+     *     )
+     * )
+     **/
+    public function actionEducationType(){
+        $education = new Education();
+        $model = $education->educationtype();
+        return $model;
+    }
+
+
+    /**
+     * @SWG\Post(path="/education/list",
+     *     tags={"云平台-Education-教学"},
+     *     summary="教学列表",
+     *     description="教学列表",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "emp_number",
+     *        description = "带教人id",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "student",
+     *        description = "学生姓名",
+     *        required = false,
+     *        type = "string"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "type_id",
+     *        description = "学生类别id",
+     *        required = false,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "start_time",
+     *        description = "带教开始时间",
+     *        required = false,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "end_time",
+     *        description = "带教结束时间",
+     *        required = false,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回教学列表"
+     *     ),
+     *     @SWG\Response(
+     *         response = 403,
+     *         description = "查询失败",
+     *     )
+     * )
+     *
+     **/
+    public function actionList(){
+        $data = yii::$app->request->post();
+        if(!isset($data['emp_number'])){
+            $data['emp_number'] = $this->empNumber;
+        }
+        $education = new Education();
+        $model = $education->list($data);
+        return $model;
+    }
+
+
+
+
+
+    /**
+     * @SWG\Post(path="/education/education-del",
+     *     tags={"云平台-Education-教学"},
+     *     summary="删除学生",
+     *     description="删除学生",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "id[]",
+     *        description = "教学id",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "成功"
+     *     ),
+     *     @SWG\Response(
+     *         response = 403,
+     *         description = "删除失败"
+     *     ),
+     * )
+     *
+     **/
+    public function actionEducationDel(){
+        $id = yii::$app->request->post('id');
+        $education = new Education();
+        $model = $education->educationdel($id);
+        return $model;
+    }
+
+
+
+
+    /**
+     * @SWG\Post(path="/education/attachment-del",
+     *     tags={"云平台-Education-教学"},
+     *     summary="删除附件",
+     *     description="删除附件",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "emp_number[]",
+     *        description = "员工id 数组",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "id[]",
+     *        description = "附件id 数组",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "成功"
+     *     ),
+     *     @SWG\Response(
+     *         response = 403,
+     *         description = "删除失败"
+     *     ),
+     * )
+     *
+     **/
+    public function actionAttachmentDel(){
+        $id = yii::$app->request->post('id');
+        $emp_number = yii::$app->request->post('emp_number');
+        $education = new Education();
+        $model = $education->attachmentdel($emp_number,$id);
+        return $model;
+    }
+
+
+
+    /**
+     * @SWG\Post(path="/education/score-list",
+     *     tags={"云平台-Education-教学"},
+     *     summary="打分学生列表",
+     *     description="打分学生列表",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "emp_number",
+     *        description = "带教员工id",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "month",
+     *        description = "月份",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "成功"
+     *     ),
+     *     @SWG\Response(
+     *         response = 403,
+     *         description = "查询失败"
+     *     ),
+     * )
+     *
+     **/
+    public function actionScoreList(){
+        $emp_number = yii::$app->request->post('emp_number');
+        $month = yii::$app->request->post('month');
+        $education = new Education();
+        $model = $education->scorelist($emp_number,$month);
+        return $model;
+    }
+
+
+
+
+
+    /**
+     * @SWG\Post(path="/education/score",
+     *     tags={"云平台-Education-教学"},
+     *     summary="打分提交",
+     *     description="打分提交",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "data",
+     *        description = "[student_id,score]打分数组  学生id 和分数",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "month",
+     *        description = "月份",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "成功"
+     *     ),
+     *     @SWG\Response(
+     *         response = 403,
+     *         description = "提交失败"
+     *     ),
+     * )
+     *
+     **/
+    public function actionScore(){
+        $data = yii::$app->request->post();
+        $education = new Education();
+        $model = $education->score($data);
+        return $model;
+    }
+
+
+
+    /**
+     * @SWG\Post(path="/education/education-sel",
+     *     tags={"云平台-Education-教学"},
+     *     summary="查看详情",
+     *     description="查看详情",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "id",
+     *        description = "教学id",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "成功"
+     *     ),
+     *     @SWG\Response(
+     *         response = 403,
+     *         description = "查询失败"
+     *     ),
+     * )
+     *
+     **/
+    public function actionEducationSel(){
+        $id = yii::$app->request->post('id');
+        $education = new Education();
+        $model = $education->educationsel($id);
+        return $model;
+    }
+
+
+
+    /**
+     * @SWG\Post(path="/education/selempname",
+     *     tags={"云平台-Education-教学"},
+     *     summary="学生姓名",
+     *     description="学生姓名",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "成功"
+     *     ),
+     *     @SWG\Response(
+     *         response = 403,
+     *         description = "查询失败"
+     *     ),
+     * )
+     *
+     **/
+    public function actionSelempname(){
+        $education = new Education();
+        $model = $education->selname();
+        return $model;
+    }
+
+
+
+
+
+
+
+}
+

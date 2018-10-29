@@ -1,0 +1,240 @@
+<?php
+namespace frontend\controllers\v1;
+use common\models\folder\File;
+use common\models\folder\Folder;
+use yii\web\Response;
+use yii;
+
+class FolderController extends \common\rest\Controller
+{
+
+
+    /**
+     * @var string
+     */
+    public $modelClass = 'common\models\Folder';
+
+    /**
+     * @var array
+     */
+    public $serializer = [
+        'class' => 'common\rest\Serializer',    // 返回格式数据化字段
+        'collectionEnvelope' => 'data',       // 制定数据字段名称
+        'message' => '操作成功',                      // 文本提示
+    ];
+
+
+    /**
+     * @param  [action] yii\rest\IndexAction
+     * @return [type]
+     */
+    public function beforeAction($action)
+    {
+        $format = \Yii::$app->getRequest()->getQueryParam('format', 'json');
+
+        if ($format == 'xml') {
+            \Yii::$app->response->format = \yii\web\Response::FORMAT_XML;
+        } else {
+            \Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+        }
+
+        return $action;
+    }
+
+    /**
+     * @param  [type]
+     * @param  [type]
+     * @return [type]
+     */
+    public function afterAction($action, $result)
+    {
+        $result = parent::afterAction($action, $result);
+
+        return $result;
+    }
+
+    public function behaviors()
+    {
+        $behaviors = parent::behaviors();
+        $behaviors['contentNegotiator']['formats']['text/html'] = Response::FORMAT_HTML;
+        return $behaviors;
+    }
+
+
+    public function actions()
+    {
+        $actions = parent::actions();
+        unset($actions['index']);
+        return $actions;
+    }
+
+
+    /**
+     * @SWG\Post(path="/folder/folder-list",
+     *     tags={"云平台-Folder-文件管理"},
+     *     summary="文件列表",
+     *     description="文件列表",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "folder_id",
+     *        description = "文件夹id",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回文件列表信息"
+     *     ),
+     * )
+     *
+     **/
+    public function actionFolderList(){
+        $folder_id = yii::$app->request->post('folder_id');
+        $folder = new Folder();
+        $model = $folder->folderlist($folder_id);
+        return $model;
+    }
+
+
+    /**
+     * @SWG\Post(path="/folder/folder-add",
+     *     tags={"云平台-Folder-文件管理"},
+     *     summary="添加文件夹",
+     *     description="添加文件夹",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "folder_name",
+     *        description = "文件夹名",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "folder_id",
+     *        description = "文件夹表id 根目录为0",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回文件信息"
+     *     ),
+     * )
+     *
+     **/
+    public function actionFolderAdd(){
+        $folder_name = Yii::$app->request->post('folder_name');
+        $folder_id = Yii::$app->request->post('folder_id');
+        $path = env('STORAGE_BASE_URL');
+        if($folder_id == ''){
+            $str = '/file/'.$folder_name;
+        }else{
+            $folder = Folder::find()->where(['id'=>$folder_id])->one();
+            $str = $folder['url'].'/'.$folder_name;
+        }
+
+
+        $url = $path.$str;
+        if(!file_exists($url)){
+            mkdir($url);
+        }else{
+            $this->serializer['message'] = '文件夹已存在';
+            $this->serializer['status'] = false;
+            return false;
+        }
+        if(file_exists($url)){
+            $folder = new Folder();
+            $folder->folder_name = $folder_name;
+            $folder->url =  $str;
+            $folder->level_id = $folder_id;
+            $folder->time = date('Y-m-d H:i:s',time());
+            return($folder->save());
+        }
+    }
+
+
+
+
+    /**
+     * @SWG\Post(path="/folder/file-add",
+     *     tags={"云平台-Folder-文件管理"},
+     *     summary="添加文件",
+     *     description="添加文件",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "file",
+     *        description = "文件",
+     *        required = true,
+     *        type = "file"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "folder_id",
+     *        description = "文件夹表id 根目录为0",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回文件信息"
+     *     ),
+     * )
+     *
+     **/
+    public function actionFileAdd(){
+        $file = $_FILES['file'];
+        $name = $file['name'];
+        $houzhui = substr(strrchr($name, '.'), 1);
+        $id = uniqid();
+        $url_name =  $id.'.'.$houzhui;
+        //return $url_name;
+        $size = $file['size'];
+        $folder_id = Yii::$app->request->post('folder_id');
+        $path = env('STORAGE_BASE_URL');
+        if($folder_id == 0){
+            $str = '/file/';
+        }else{
+            $folder = Folder::find()->where(['id'=>$folder_id])->one();
+            $str = $folder['url'];
+        }
+        $documentPath = $path.$str;
+        $info = move_uploaded_file($file['tmp_name'],$documentPath.$url_name);
+        if($info){
+            $file = new File();
+            $file->file_name = $name;
+            $file->url_name = $url_name;
+            $file->file_size = $size;
+            $file->folder_id = $folder_id;
+            $file->file_time = date('Y-m-d',time());
+            return $file->save();
+        }else{
+            return $info;
+        }
+    }
+
+}
+

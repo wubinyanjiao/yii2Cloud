@@ -1,0 +1,472 @@
+<?php
+namespace frontend\controllers\v1;
+
+use Yii;
+use yii\web\Response;
+use yii\helpers\Url;
+use yii\web\Controller;
+use yii\helpers\ArrayHelper;
+use common\models\shift\Schedule;
+use common\models\shift\ShiftDate;
+use common\models\shift\ShiftType;
+use common\models\shift\Shift;
+use common\models\shift\ShiftAssignment;
+use common\models\shift\Constraint;
+use common\models\ConfigCustomer;
+use common\models\employee\Employee;
+use common\models\shift\ShiftResultConfirm;
+use common\models\shift\ShiftResult;
+use common\models\shift\ShiftResultOrange;
+use common\models\shift\ShiftOrderBy;
+use common\models\shift\ShiftModel;
+use common\models\shift\ShiftTypeDetail;
+use common\models\user\User;
+
+class ShiftNoTokenController extends \common\rest\SysController
+{
+    /**
+     * @var string
+     */
+    public $modelClass = 'common\models\shift\Schedule';
+
+    /**
+     * 
+     * @var array
+     */
+    public $serializer = [
+        'class' => 'common\rest\Serializer',    // 返回格式数据化字段
+        'collectionEnvelope' => 'result',       // 制定数据字段名称
+        'message' => 'OK',                      // 文本提示
+        'errno'   => 0,
+        'status'  =>'',
+    ];
+
+    
+
+    /**
+     * @param  [action] yii\rest\IndexAction
+     * @return [type] 
+     */
+    public function beforeAction($action)
+    {
+        $format = \Yii::$app->getRequest()->getQueryParam('format', 'json');
+
+        if($format == 'xml'){
+            \Yii::$app->response->format = \yii\web\Response::FORMAT_XML;
+        }else{
+            \Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+        }
+
+        return $action;
+    }
+
+    /**
+     * @param  [type]
+     * @param  [type]
+     * @return [type]
+     */
+    public function afterAction($action, $result){
+        $result = parent::afterAction($action, $result);
+
+        return $result;
+    }
+
+    public function behaviors()
+    {
+        $behaviors = parent::behaviors();
+        $behaviors['contentNegotiator']['formats']['text/html'] = Response::FORMAT_HTML;
+        return $behaviors;
+    }
+
+    public function actions()
+    {
+        $actions = parent::actions();
+        unset($actions['index']);
+        return $actions;
+    }
+
+    /**
+     * @SWG\Post(path="/shift-no-token/insert",
+     *     tags={"云平台-noToken-排班计划"},
+     *     summary="引擎xml写入数据库",
+     *     description="引擎xml写入数据库",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "schedule_id",
+     *        description = "班次计划id",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回技能类型列表"
+     *     ),
+     * )
+     *
+    **/
+    public function actionInsert(){
+
+        $post=Yii::$app->request->post();
+        $scheduleID=$post['schedule_id'];
+        $schedule=Schedule::find()->where('id =:schedule_id ',[':schedule_id'=>$post['schedule_id']])->one();
+        if(!isset($schedule)){
+            $this->serializer['errno']   = 200600;
+            $this->serializer['status']   = 'false';
+            $this->serializer['message']   = '没有该计划';
+            return [];
+
+        }
+
+        $work_station=$schedule->location_id;
+        $is_insert=$schedule->is_insert;
+
+        $first_date=$schedule->shift_date;
+
+        if( $is_insert==Schedule::IS_INSERT ){
+            $this->serializer['errno']   = 200600;
+            $this->serializer['status']   = 'false';
+            $this->serializer['message']   = '已经插入成功';
+            return [];
+         
+        }
+        $shiftdatemodel=new ShiftDate;
+        $typemodel=new ShiftType;
+        $employmodel=new Employee;
+        $resultmodel=new ShiftResult;
+        $nighttype='';
+        $nighttypeentity=$typemodel->getNightType($work_station);
+        if(isset( $nighttypeentity)){
+            $nighttype=$nighttypeentity->id;
+        }
+
+
+        $transaction = Yii::$app->db->beginTransaction();
+        try{
+                $shiftdatemodel=new ShiftDate;
+                $typemodel=new ShiftType;
+                $employmodel=new Employee;
+                $resultmodel=new ShiftResult;
+
+                $usermodel=new User;
+
+                //获取solve文件
+                $path=Yii::getAlias('@base');
+                $base_path=dirname($path).'/optaplannerxml/';
+                $last=substr($scheduleID, -1);
+                $xml_path=$base_path.'xml_'.$last.'/roster_'.$scheduleID.'_solved.xml';
+
+                $emp_new=array();
+                $emp_all=array();
+
+                //获取schedule的日期
+                $shiftDateListEntity=$shiftdatemodel->getDatesBySchedule($scheduleID);
+                $shiftDateList=array_column($shiftDateListEntity, 'shift_date');
+                $shiftTypeList=$typemodel->getShifType($work_station);
+                $shiftTypeList = array_column($shiftTypeList, NULL, 'id');
+
+                //获取改组所有员工
+                //如果有模板数据，则顺序去模板数据员工数据
+                $orderbymodel=new ShiftOrderBy;
+                $ordernow=array();
+                $ordernow=$orderbymodel->getShiftOrderBy($scheduleID);
+                $workStationEmp=$usermodel->FutureEmployee($work_station,$first_date);
+                $emp_all=array_column($workStationEmp, 'emp_number'); 
+
+                $arr='';
+                $arr = file_get_contents($xml_path);
+                $result=xmlToArray($arr);  
+                $shift_on_emp=array_unique(array_column($result['Assignment'], 'Employee'));
+
+                foreach ($emp_all as $key => $employee) {
+                    if(in_array($employee, $shift_on_emp)){
+                        foreach ($result['Assignment'] as $k => $assignment) {
+                            if($assignment['Employee']==$employee){
+                                $employee_array[$employee][]=$assignment;
+                            }
+                        }
+                    }else{
+                        $employee_array[$employee][]='';
+                    }
+                }
+                $confirmmodel=new ShiftResultConfirm;
+
+                foreach ($result['Assignment'] as $key => $assignment) {
+                    if(in_array($assignment['Date'], $shiftDateList)){
+                        //判断是不是半天班
+                        $is_half=$shiftTypeList[$assignment['ShiftType']]['is_work_half'];
+                        if($is_half==ShiftType::IS_SHIFT_HALF_NO){//全天
+                            $rest_type=ShiftResult::IS_REST_NO;
+                        }else{
+                            $rest_type=ShiftResult::IS_REST_HALF;
+                        }
+
+                       $confimone=$confirmmodel->getConfrimByEmpAndDate($assignment['Employee'],$assignment['Date'],$scheduleID);
+                 
+                       if(isset($confimone)){
+
+                            $orange_type_id=1;
+                            $confimone->shift_type_id_backup=$orange_type_id;
+                            $confimone->rest_type=$rest_type;
+                            $confimone->leave_type=ShiftResult::IS_LEAVE_NO;
+                            $confimone->leave_type_id=0;
+                            $confimone->shift_type_id=$assignment['ShiftType'];
+
+                            $type_id=$assignment['ShiftType'];
+                            if(isset($shiftTypeList[$confimone->shift_type_id])){
+                                $typeTimeSpan=$typemodel->getShifTypeTimeAreaById($type_id);
+                                $confimone->frist_type_id=$typeTimeSpan['frist_type_id'];
+                                $confimone->second_type_id=$typeTimeSpan['second_type_id'];
+                                $confimone->third_type_id=$typeTimeSpan['third_type_id'];
+
+                            }else{
+                                $confimone->frist_type_id=$confimone->shift_type_id;
+                                $confimone->second_type_id=$confimone->shift_type_id;
+                                $confimone->third_type_id=$confimone->shift_type_id;
+
+                            }
+
+                            if(!$confimone->save()){
+                                throw new \Exception();
+                            }
+                      
+                       }
+                        
+                    }
+
+                }
+
+                if(count($ordernow)==0){//如果没有存储过员工顺序
+                    //存储排序
+                    foreach ($emp_all as $key_index => $value_index) {
+                        $orderbymodel=new ShiftOrderBy;
+                        $orderdata['ShiftOrderBy']['emp_number']=$value_index;
+                        $orderdata['ShiftOrderBy']['work_station']=$work_station;
+                        $orderdata['ShiftOrderBy']['shift_index']=$key_index;
+                        $orderdata['ShiftOrderBy']['schedule_id']=$scheduleID;
+                        if(!$orderbymodel->addShiftOrder($orderdata)){
+                                throw new \Exception();
+                        }
+
+                    }
+                }
+
+
+                foreach ($employee_array as $key => $employee) {
+                    $employ_day=array_column($employee,'Date');
+                    $employ_day=array_unique($employ_day);
+
+
+                    //该员工哪几天不上班
+                    $diff=array_diff($shiftDateList, $employ_day);
+                    if(!empty($diff)){
+                        foreach ($diff as $difkey=> $difday) {
+
+                             //判断前一天是不是夜班
+                            $datebefore=  date("Y-m-d",strtotime("-1 day",strtotime($difday)));
+
+                            $beforeshifttype=0;
+                            $beforeshift=$confirmmodel->getConfrimByEmpAndDate($key,$datebefore,$scheduleID);
+
+                            if(isset($beforeshift)){
+                                $beforeshifttype=$beforeshift->shift_type_id;
+                            }
+
+                            $is_night=false;
+                            if($nighttype !='' && $beforeshifttype==$nighttype){
+                                $is_night=true;
+                            }
+
+                            if($is_night==true){
+                                $type_id_rest=ShiftResult::NIGHT_REST;//夜休
+
+                            }else{
+                                $type_id_rest=ShiftResult::GENERAN_REST;//公休
+                            }
+                            $confimone1=$confirmmodel->getConfrimByEmpAndDate($key,$difday,$scheduleID);
+
+                            //判断当天这个人有没有假期
+
+                            $if_have_leave=$confirmmodel->getLeaveOfEmpByEmpAndDate($key,$difday);
+
+                            if($if_have_leave){
+
+                                if($if_have_leave['duration_type']>0){//半天假
+                                    $new_rest_type=0;
+                                    $new_leave_type=2;
+                                    $type_id_rest=0;
+                                    $new_leave_type_id=$if_have_leave['leave_type_id'];
+
+                                }else{//全天假
+                                    $new_rest_type=0;
+                                    $new_leave_type=1;
+                                    $type_id_rest=0;
+                                    $new_leave_type_id=$if_have_leave['leave_type_id'];
+                                }
+                            }else{
+                                $new_rest_type=ShiftResult::IS_REST_DAY;
+                                $new_leave_type=0;
+                                $new_leave_type_id=0;
+                            }
+
+                            if($confimone1->shift_type_id==ShiftResult::NO_REST_SHIFT){
+                                $orange_type_id=$confimone1->shift_type_id;
+                                $confimone1->shift_type_id_backup=$orange_type_id;
+                                $confimone1->rest_type=$new_rest_type;
+                                $confimone1->shift_type_id=$type_id_rest;
+                                $confimone1->leave_type=$new_leave_type;
+                                $confimone1->leave_type_id=$new_leave_type_id;
+                                if(!$confimone1->save()){
+                                    throw new \Exception();
+                                }
+                            }
+
+                        }
+
+
+                    }
+
+                }
+
+                Schedule::updateAll(['is_insert'=>Schedule::IS_INSERT],['id'=>$scheduleID]);//临时注释
+                $transaction->commit();
+                $this->serializer['errno']   = 0;
+                $this->serializer['status']   = true;
+                $this->serializer['message']   = '插入成功';
+              
+
+            }catch(\Exception $e) {
+                $transaction->rollback();
+                $this->serializer['errno']   = 200600;
+                $this->serializer['status']   = false;
+                $this->serializer['message']   = '插入失败';
+                return [];
+            
+            }
+        
+
+    }
+
+
+    /**
+     * @SWG\Post(path="/shift-no-token/update",
+     *     tags={"云平台-noToken-排班计划"},
+     *     summary="引擎xml写入数据库",
+     *     description="引擎xml写入数据库",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "schedule_id",
+     *        description = "更新之前的字段",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回技能类型列表"
+     *     ),
+     * )
+     *
+    **/
+    public function actionUpdate(){
+
+
+        $post=Yii::$app->request->post();
+        $scheduleID=json_decode($post['schedule_id']);
+   
+        $result_data=ShiftResult::find()->where(['in','schedule_id',$scheduleID])->all();
+
+        $typemodel=new ShiftType;
+        foreach ($result_data as $key => $value) {
+            //查看临时表是否有数据
+            $detail=ShiftTypeDetail::find()->where(['shift_result_id'=>$value->id])->asArray()->all();
+            $data[$key]['frist_type_id']='';
+            $data[$key]['second_type_id']='';
+            $data[$key]['third_type_id']='';
+            if(!empty($detail)){ 
+                foreach ($detail as $key2 => $value2) {
+                   if($value2['time_mark']==1){
+                        $data[$key]['frist_type_id']=$value2['shift_type_id'];
+                   }if($value2['time_mark']==2){
+                        $data[$key]['second_type_id']=$value2['shift_type_id'];
+                   }
+                }
+            }
+
+            //如果临时表中没有数据
+            if(empty($data[$key]['frist_type_id'])&&empty($data[$key]['second_type_id'])){
+                $data[$key]=$typemodel->getShifTypeTimeAreaById($value->shift_type_id);
+            }
+
+            if(empty($value->frist_type_id)){
+                $value->frist_type_id=$data[$key]['frist_type_id'];
+            }
+            if(empty($value->second_type_id)){
+                $value->second_type_id=$data[$key]['second_type_id'];
+            }
+            if(empty($value->third_type_id)){
+                $value->third_type_id=$data[$key]['third_type_id'];
+            }
+
+            $value->save();
+            
+        }
+
+        $this->serializer['errno']   = 0;
+        $this->serializer['status']   = true;
+        $this->serializer['message']   = '更新成功';
+    }
+
+    /**
+     * @SWG\Post(path="/shift-no-token/update2",
+     *     tags={"云平台-noToken-排班计划"},
+     *     summary="引擎xml写入数据库",
+     *     description="引擎xml写入数据库",
+     *     produces={"application/json"},
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回技能类型列表"
+     *     ),
+     * )
+     *
+    **/
+
+    public function actionUpdate2(){
+        $detail=ShiftTypeDetail::find()->asArray()->all();
+        $transaction = Yii::$app->db->beginTransaction();
+        try{
+            foreach ($detail as $key => $value) {
+                $result=ShiftResult::find()->where(['id'=>$value['shift_result_id']])->one();
+
+                if(isset($result)){
+                    if($value['time_mark']==1){
+                        $result->frist_type_id=(int)$value['shift_type_id'];
+                    }else if($value['time_mark']==2){
+                        $result->second_type_id=(int)$value['shift_type_id'];
+                    }else if($value['time_mark']==3){
+                        $result->third_type_id=(int)$value['shift_type_id'];
+                    }
+
+                    if(!$result->save()){
+                        throw new \Exception();
+                    }
+                }
+            }
+            $transaction->commit();
+            $this->serializer['errno']   = 0;
+            $this->serializer['status']   = true;
+            $this->serializer['message']   = '更新成功';
+        }catch(\Exception $e) {
+            $transaction->rollback();
+            $this->serializer['errno']   = 200600;
+            $this->serializer['status']   = false;
+            $this->serializer['message']   = '更新失败';
+            return [];
+        
+        } 
+
+    }
+
+}
+
+?>

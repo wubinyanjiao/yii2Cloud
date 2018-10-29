@@ -1,0 +1,308 @@
+<?php
+
+namespace common\models\meeting;
+
+use common\models\attachment\Attachment;
+use Yii;
+use \common\models\meeting\base\Meeting as BaseMeeting;
+use yii\helpers\ArrayHelper;
+
+/**
+ * This is the model class for table "hs_hr_meeting".
+ */
+class Meeting extends BaseMeeting
+{
+
+    public function behaviors()
+    {
+        return ArrayHelper::merge(
+            parent::behaviors(),
+            [
+                # custom behaviors
+            ]
+        );
+    }
+
+    public function rules()
+    {
+        return ArrayHelper::merge(
+            parent::rules(),
+            [
+                # custom validation rules
+            ]
+        );
+    }
+
+    public function meetinglist($data){
+        $emp_number = $data['emp_number'];
+        $meeting_name = isset($data['meeting_name']) ? $data['meeting_name']:'';
+        $meeting_start_time = isset($data['meeting_start_time']) ? $data['meeting_start_time']:'';
+        if($meeting_start_time != ''){
+            $meeting_start_time=strtotime($meeting_start_time);
+            $meeting_start_time=date('Y-m-d',$meeting_start_time);
+        }
+        $meeting_end_time = isset($data['meeting_end_time']) ? $data['meeting_end_time']:'';
+        if($meeting_end_time != ''){
+            $meeting_end_time=strtotime($meeting_end_time);
+            $meeting_end_time=date('Y-m-d',$meeting_end_time);
+        }
+        $meeting_language = isset($data['meeting_language']) ? $data['meeting_language']:'';
+        $host_unit = isset($data['host_unit']) ? $data['host_unit']:'';
+        $thesis_type = isset($data['thesis_type']) ? $data['thesis_type']:'';
+        $thesis_name = isset($data['thesis_name']) ? $data['thesis_name']:'';
+        $author = isset($data['author']) ? $data['author']:'';
+        $ranking = isset($data['ranking']) ? $data['ranking']:'';
+        $is_exchange = isset($data['is_exchange']) ? $data['is_exchange']:'';
+        $exchange_type = isset($data['exchange_type']) ? $data['exchange_type']:'';
+        $first_author_type = isset($data['first_author_type']) ? $data['first_author_type']:'';
+        $first_author = isset($data['first_author']) ? $data['first_author']:'';
+        $first_author_unit = isset($data['first_author_unit']) ? $data['first_author_unit']:'';
+        $corresponding_author_type = isset($data['corresponding_author_type']) ? $data['corresponding_author_type']:'';
+        $corresponding_author = isset($data['corresponding_author']) ? $data['corresponding_author']:'';
+        $corresponding_author_unit = isset($data['corresponding_author_unit']) ? $data['corresponding_author_unit']:'';
+        $award_name = isset($data['award_name']) ? $data['award_name']:'';
+        $honor_name = isset($data['honor_name']) ? $data['honor_name']:'';
+        $honor_type = isset($data['honor_type']) ? $data['honor_type']:'';
+
+        $where ="emp_number = '$emp_number'";
+        if($meeting_name != ''){
+            $where .=" and meeting_name = '$meeting_name'";
+        }
+        if($meeting_start_time != ''){
+            $where .=" and meeting_start_time > '$meeting_start_time'";
+        }
+        if($meeting_end_time != ''){
+            $where .=" and meeting_end_time < '$meeting_end_time'";
+        }
+        if($meeting_language != ''){
+            $where .=" and meeting_language = '$meeting_language'";
+        }
+        if($host_unit != ''){
+            $where .=" and host_unit = '$host_unit'";
+        }
+        if($thesis_type != ''){
+            $where .=" and thesis_type = '$thesis_type'";
+        }
+        if($thesis_name != ''){
+            $where .=" and thesis_name = '$thesis_name'";
+        }
+        if($author != ''){
+            $where .=" and author = '$author'";
+        }
+        if($ranking != ''){
+            $where .=" and ranking = '$ranking'";
+        }
+        if($is_exchange != ''){
+            $where .=" and is_exchange = '$is_exchange'";
+        }
+        if($exchange_type != ''){
+            $where .=" and exchange_type = '$exchange_type'";
+        }
+        if($first_author_type != ''){
+            $where .=" and first_author_type = '$first_author_type'";
+        }
+        if($first_author != ''){
+            $where .=" and first_author = '$first_author'";
+        }
+        if($first_author_unit != ''){
+            $where .=" and first_author_unit = '$first_author_unit'";
+        }
+        if($corresponding_author_type != ''){
+            $where .=" and corresponding_author_type = '$corresponding_author_type'";
+        }
+        if($corresponding_author != ''){
+            $where .=" and corresponding_author = '$corresponding_author'";
+        }
+        if($corresponding_author_unit != ''){
+            $where .=" and corresponding_author_unit = '$corresponding_author_unit'";
+        }
+        if($award_name != ''){
+            $where .=" and award_name = '$award_name'";
+        }
+        if($honor_name != ''){
+            $where .=" and honor_name = '$honor_name'";
+        }
+        if($honor_type != ''){
+            $where .=" and honor_type = '$honor_type'";
+        }
+
+        $query = Meeting::find()->asArray()->where($where)->all();
+        /*foreach ($query as $k =>$v){
+            if($v['meeting_language'] == 0){
+                $query[$k]['meeting_language'] = '中文';
+            }else if($v['meeting_language'] == 1){
+                $query[$k]['meeting_language'] = '英文';
+            }else{
+                $query[$k]['meeting_language'] = '';
+            }
+
+
+            if($v['thesis_type'] == 0){
+                $query[$k]['thesis_type'] = '全文';
+            }else if ($v['thesis_type'] == 1){
+                $query[$k]['thesis_type'] = '摘要';
+            }else{
+                $query[$k]['thesis_type'] = '';
+            }
+
+
+            if($v['is_exchange'] == 0){
+                $query[$k]['is_exchange'] = '否';
+            }else if ($v['is_exchange'] == 1){
+                $query[$k]['is_exchange'] = '是';
+            }else{
+                $query[$k]['is_exchange'] = '';
+            }
+        }*/
+        return $query;
+    }
+
+
+    public function meetingadd($data){
+        $emp_number = $data['emp_number'];
+        $meeting_name = isset($data['meeting_name']) ? $data['meeting_name']:'';
+        $meeting_start_time = isset($data['meeting_start_time']) ? $data['meeting_start_time']:'';
+        if($meeting_start_time != ''){
+            $meeting_start_time=strtotime($meeting_start_time);
+            $meeting_start_time=date('Y-m-d',$meeting_start_time);
+        }
+        $meeting_end_time = isset($data['meeting_end_time']) ? $data['meeting_end_time']:'';
+        if($meeting_end_time != ''){
+            $meeting_end_time=strtotime($meeting_end_time);
+            $meeting_end_time=date('Y-m-d',$meeting_end_time);
+        }
+
+        $meeting_language = isset($data['meeting_language']) ? $data['meeting_language']:'';
+        $host_unit = isset($data['host_unit']) ? $data['host_unit']:'';
+        $thesis_type = isset($data['thesis_type']) ? $data['thesis_type']:'';
+        $thesis_name = isset($data['thesis_name']) ? $data['thesis_name']:'';
+        $author = isset($data['author']) ? $data['author']:'';
+        $ranking = isset($data['ranking']) ? $data['ranking']:'';
+        $is_exchange = isset($data['is_exchange']) ? $data['is_exchange']:'';
+        $exchange_type = isset($data['exchange_type']) ? $data['exchange_type']:'';
+        $first_author_type = isset($data['first_author_type']) ? $data['first_author_type']:'';
+        $first_author = isset($data['first_author']) ? $data['first_author']:'';
+        $first_author_unit = isset($data['first_author_unit']) ? $data['first_author_unit']:'';
+        $corresponding_author_type = isset($data['corresponding_author_type']) ? $data['corresponding_author_type']:'';
+        $corresponding_author = isset($data['corresponding_author']) ? $data['corresponding_author']:'';
+        $corresponding_author_unit = isset($data['corresponding_author_unit']) ? $data['corresponding_author_unit']:'';
+        $award_name = isset($data['award_name']) ? $data['award_name']:'';
+        $honor_name = isset($data['honor_name']) ? $data['honor_name']:'';
+        $honor_type = isset($data['honor_type']) ? $data['honor_type']:'';
+        $remarks = isset($data['remarks']) ? $data['remarks']:'';
+
+        $meeting = new Meeting();
+        $meeting-> emp_number = $emp_number;
+        $meeting-> meeting_name = $meeting_name;
+        $meeting-> meeting_start_time = $meeting_start_time;
+        $meeting-> meeting_end_time = $meeting_end_time;
+        $meeting-> meeting_language = $meeting_language;
+        $meeting-> host_unit = $host_unit;
+        $meeting-> thesis_type = $thesis_type;
+        $meeting-> thesis_name = $thesis_name;
+        $meeting-> author = $author;
+        $meeting-> ranking = $ranking;
+        $meeting-> is_exchange = $is_exchange;
+        $meeting-> exchange_type = $exchange_type;
+        $meeting-> first_author_type = $first_author_type;
+        $meeting-> first_author = $first_author;
+        $meeting-> first_author_unit = $first_author_unit;
+        $meeting-> corresponding_author_type = $corresponding_author_type;
+        $meeting-> corresponding_author = $corresponding_author;
+        $meeting-> corresponding_author_unit = $corresponding_author_unit;
+        $meeting-> award_name = $award_name;
+        $meeting-> honor_name = $honor_name;
+        $meeting-> honor_type = $honor_type;
+        $meeting-> remarks = $remarks;
+        $query = $meeting->save();
+        return $query;
+    }
+
+    public function meetingupdate($data){
+        $id = $data['id'];
+        $meeting_name = isset($data['meeting_name']) ? $data['meeting_name']:'';
+        $meeting_start_time = isset($data['meeting_start_time']) ? $data['meeting_start_time']:'';
+        if($meeting_start_time != ''){
+            $meeting_start_time=strtotime($meeting_start_time);
+            $meeting_start_time=date('Y-m-d',$meeting_start_time);
+        }
+        $meeting_end_time = isset($data['meeting_end_time']) ? $data['meeting_end_time']:'';
+        if($meeting_end_time != ''){
+            $meeting_end_time=strtotime($meeting_end_time);
+            $meeting_end_time=date('Y-m-d',$meeting_end_time);
+        }
+
+        $meeting_language = isset($data['meeting_language']) ? $data['meeting_language']:'';
+        $host_unit = isset($data['host_unit']) ? $data['host_unit']:'';
+        $thesis_type = isset($data['thesis_type']) ? $data['thesis_type']:'';
+        $thesis_name = isset($data['thesis_name']) ? $data['thesis_name']:'';
+        $author = isset($data['author']) ? $data['author']:'';
+        $ranking = isset($data['ranking']) ? $data['ranking']:'';
+        $is_exchange = isset($data['is_exchange']) ? $data['is_exchange']:'';
+        $exchange_type = isset($data['exchange_type']) ? $data['exchange_type']:'';
+        $first_author_type = isset($data['first_author_type']) ? $data['first_author_type']:'';
+        $first_author = isset($data['first_author']) ? $data['first_author']:'';
+        $first_author_unit = isset($data['first_author_unit']) ? $data['first_author_unit']:'';
+        $corresponding_author_type = isset($data['corresponding_author_type']) ? $data['corresponding_author_type']:'';
+        $corresponding_author = isset($data['corresponding_author']) ? $data['corresponding_author']:'';
+        $corresponding_author_unit = isset($data['corresponding_author_unit']) ? $data['corresponding_author_unit']:'';
+        $award_name = isset($data['award_name']) ? $data['award_name']:'';
+        $honor_name = isset($data['honor_name']) ? $data['honor_name']:'';
+        $honor_type = isset($data['honor_type']) ? $data['honor_type']:'';
+        $remarks = isset($data['remarks']) ? $data['remarks']:'';
+
+        $meeting = Meeting::find()->where(['id'=>$id])->one();
+        $meeting-> meeting_name = $meeting_name;
+        $meeting-> meeting_start_time = $meeting_start_time;
+        $meeting-> meeting_end_time = $meeting_end_time;
+        $meeting-> meeting_language = $meeting_language;
+        $meeting-> host_unit = $host_unit;
+        $meeting-> thesis_type = $thesis_type;
+        $meeting-> thesis_name = $thesis_name;
+        $meeting-> author = $author;
+        $meeting-> ranking = $ranking;
+        $meeting-> is_exchange = $is_exchange;
+        $meeting-> exchange_type = $exchange_type;
+        $meeting-> first_author_type = $first_author_type;
+        $meeting-> first_author = $first_author;
+        $meeting-> first_author_unit = $first_author_unit;
+        $meeting-> corresponding_author_type = $corresponding_author_type;
+        $meeting-> corresponding_author = $corresponding_author;
+        $meeting-> corresponding_author_unit = $corresponding_author_unit;
+        $meeting-> award_name = $award_name;
+        $meeting-> honor_name = $honor_name;
+        $meeting-> honor_type = $honor_type;
+        $meeting-> remarks = $remarks;
+        $query = $meeting->save();
+        return $query;
+    }
+
+    public function meetingsel($id){
+        $meeting = Meeting::find()->asArray()->where(['id'=>$id])->one();
+        $atta = Attachment::find()->asArray()->where(['sort_id'=>$id,'screen'=>'meeting'])->all();
+        $query['meeting'] = $meeting;
+        $query['atta'] = $atta;
+        return $query;
+    }
+
+
+
+    public function meetingdel($id){
+        $meeting = Meeting::deleteAll(['id'=>$id]);
+        $attachment = new Attachment();
+        $arr = $attachment::find()->where(['sort_id'=>$id,'screen'=>'meeting'])->all();
+
+        if ($arr){
+            foreach ($id as $k=>$v){
+                $url = $attachment::find()->select(['eattach_attachment_url'])->where(['sort_id'=>$v,'screen'=>'meeting'])->one();
+                if($url != ''){
+                    $delurl = '/data/wwwroot/uploadfile/'.$url['eattach_attachment_url'];
+                    unlink($delurl);
+                }
+
+            }
+            $query = $attachment::deleteAll(['sort_id'=>$id,'screen'=>'meeting']);
+            return $query;
+        }
+    }
+}

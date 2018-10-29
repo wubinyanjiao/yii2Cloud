@@ -1,0 +1,590 @@
+<?php
+namespace frontend\controllers\v1;
+use common\models\shift\RotationRule;
+use common\models\shift\RotationRuleWarehouse;
+use Yii;
+use yii\web\Response;
+use yii\web\Controller;
+//use yii\helpers\ArrayHelper;
+class RotationRuleWarehouseController extends \common\rest\Controller
+{
+    /**
+     * @var string
+     */
+    public $modelClass = 'common\models\shift\RotationRuleWarehouse';
+
+    /**
+     *
+     * @var array
+     */
+    public $serializer = [
+        'class' => 'common\rest\Serializer',    // 返回格式数据化字段
+        'collectionEnvelope' => 'result',       // 制定数据字段名称
+        'message' => 'OK',                      // 文本提示
+        'errno'   => 0,
+        'status'  =>'',
+    ];
+    /**
+     * @param  [action] yii\rest\IndexAction
+     * @return [type]
+     */
+    public function beforeAction($action)
+    {
+        $format = \Yii::$app->getRequest()->getQueryParam('format', 'json');
+
+        if($format == 'xml'){
+            \Yii::$app->response->format = \yii\web\Response::FORMAT_XML;
+        }else{
+            \Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+        }
+
+        return $action;
+    }
+
+    /**
+     * @param  [type]
+     * @param  [type]
+     * @return [type]
+     */
+    public function afterAction($action, $result){
+        $result = parent::afterAction($action, $result);
+
+        return $result;
+    }
+
+    public function behaviors()
+    {
+        $behaviors = parent::behaviors();
+        $behaviors['contentNegotiator']['formats']['text/html'] = Response::FORMAT_HTML;
+        return $behaviors;
+    }
+
+    public function actions()
+    {
+        $actions = parent::actions();
+        unset($actions['index']);
+        return $actions;
+    }
+    /**
+     * @SWG\Post(path="/rotation-rule-warehouse/create",
+     *     tags={"云平台-rotationRuleWarehouse-轮转规则库"},
+     *     summary="创建规则库",
+     *     description="创建规则库",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "ruleType",
+     *        description = "规则类型：空默认out调出规则in调入规则",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "ruleTypeName",
+     *        description = "规则类型名称",
+     *        required = true,
+     *        type = "string",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "ruleTitle",
+     *        description = "规则名称",
+     *        required = true,
+     *        type = "string",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "select1",
+     *        description = "存放下拉框数据 格式json单",
+     *        required = false,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "select2",
+     *        description = "存放下拉框数据 格式json多",
+     *        required = false,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "input1",
+     *        description = "存放输入框数据 格式json",
+     *        required = false,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "input2",
+     *        description = "存放输入框数据 格式json",
+     *        required = false,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "isMultiple",
+     *        description = "是否可多条 0默认1可多条",
+     *        required = false,
+     *        type = "integer",
+     *        default = 0,
+     *        enum = {0,1}
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "status",
+     *        description = "状态：0默认1开放2关闭",
+     *        required = false,
+     *        type = "integer",
+     *        default = 0,
+     *        enum = {0,1,2}
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回班次类型列表"
+     *     ),
+     *     @SWG\Response(
+     *         response = 422,
+     *         description = "Data Validation Failed 创建失败",
+     *     )
+     * )
+     *
+     **/
+    public function actionCreate()
+    {
+        $post = Yii::$app->request->post();
+        $RotationRuleWarehouse = new RotationRuleWarehouse();
+        $RotationRuleWarehouse->rotationRuleWarehouseId = $post['rotationRuleWarehouseId'];
+        $RotationRuleWarehouse->ruleTypeName = $post['ruleTypeName'];
+        $RotationRuleWarehouse->ruleTitle = $post['ruleTitle'];
+        $RotationRuleWarehouse->select1 = $post['select1'];
+        $RotationRuleWarehouse->select2 = $post['select2'];
+        $RotationRuleWarehouse->input1 = $post['input1'];
+        $RotationRuleWarehouse->input2 = $post['input2'];
+        $RotationRuleWarehouse->isMultiple = $post['isMultiple'];
+       if($RotationRuleWarehouse->add($post)){
+           echo "成";
+       }exit;
+        /*$this->serializer['errno']   = 0;
+        $this->serializer['status']   = true;
+        $this->serializer['message'] = "获取成功";*/
+        /**先把规则库中的规则类型名称和数据填充上发
+        *insert into rotationRuleWarehouse,rotationRuleWarehouseId,ruleTypeName...value(,,,);
+         */
+    }
+    /**
+     * @SWG\Post(path="/rotation-rule-warehouse/list",
+     *     tags={"云平台-rotationRuleWarehouse-轮转规则库"},
+     *     summary="获取规则列表",
+     *     description="获取规则列表",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "groupId",
+     *        description = "组id",
+     *        required = false,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "ruleType",
+     *        description = "规则类型：空默认out调出规则in调入规则",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回技能类型列表"
+     *     ),
+     * )
+     *
+     **/
+    // 轮转规则库（rotationRuleWarehouse）
+    public function actionList()
+    {
+        $a = '[
+        {
+	    "ruleWarehouseId":"3",
+	    "ruleTitle": "组长/副组长不参与轮转",
+	    "status": true,
+	    "isMultiple": "no",
+	    "formData": []
+	},
+        {
+        "ruleWarehouseId": "1",
+		"ruleTitle": "职称等级满多长时间轮转",
+		"status": false,
+		"isMultiple": "yes",
+		"formData": [
+            
+			[{
+            "type": "singleselect",
+					"id": "select1",
+					"value": "",
+					"selected": "chuji",
+					"placeholder": "",
+					"options": [{
+                            "name": "请选择",
+							"value": ""
+						},
+						{
+                            "name": "初级",
+							"value": "chuji"
+						},
+						{
+                            "name": "高级",
+							"value": "gaoji"
+						}
+					]
+				},
+				{
+                    "type": "input",
+					"id": "input1",
+					"value": "",
+					"selected": [],
+					"placeholder": "多少月",
+					"options": [
+
+                ]
+				}
+			]
+		]
+	},
+	{
+        "ruleWarehouseId": "2",
+		"ruleTitle": "学历范围",
+		"status": false,
+		"isMultiple": "no",
+		"formData": [{
+        "type": "multiselect",
+			"id": "select1",
+			"value": "",
+			"selected": [
+                    "zhongzhuan",
+                    "daxue"
+                ],
+			"placeholder": "",
+			"options": [{
+            "name": "请选择",
+					"value": ""
+				},
+				{
+                    "name": "中专",
+					"value": "zhongzhuan"
+				},
+				{
+                    "name": "大学",
+					"value": "daxue"
+				}
+			]
+		}]
+	},
+	
+	{
+	    "ruleWarehouseId":"4",
+	    "ruleTitle": "在组内满几年轮转",
+	    "status": false,
+	    "isMultiple": "no",
+	    "formData":[{
+	        "type": "singleselect",
+            "id": "select1",
+            "value": "",
+            "selected": "yinian",
+            "placeholder": "",
+            "options":[{
+                    "name":"请选择单选",
+                    "value":""},
+                {
+                    "name":"1年",
+                    "value":"yinian"
+                },
+                {
+                    "name":"2年",
+                    "value":"ernian"
+                }
+            ]
+	    }]
+	},
+	{
+	    "ruleWarehouseId":"5",
+	    "ruleTitle": "仅男生/女生",
+	    "status": false,
+	    "isMultiple": "no",
+	    "formData":[{
+	        "type": "singleselect",
+            "id": "select1",
+            "value": "",
+            "selected": "w",
+            "placeholder": "",
+            "options":[{
+                    "name":"请选择单选",
+                    "value":""},
+                {
+                    "name":"男生",
+                    "value":"m"
+                },
+                {
+                    "name":"女生",
+                    "value":"w"
+                }
+            ]
+	    }]
+	},
+	{
+        "ruleWarehouseId":"6",
+		"ruleTitle": "年龄范围",
+		"status": false,
+		"isMultiple": "no",
+		"formData": [{
+			"type": "input",
+			"id": "input1",
+			"value": "",
+			"selected": [],
+			"placeholder": "最小年龄",
+			"options": [
+
+				]
+					},
+			{
+				"type": "input",
+				"id": "input2",
+				"value": "",
+				"valuequeue": ["input"],
+				"selected": [],
+				"placeholder": "最大年龄",
+				"options": [
+
+			]   
+			}
+
+		]
+	}
+]';
+        $ruleType = Yii::$app->request->post('ruleType');
+        $rotationRuleWarehouse = new RotationRuleWarehouse();
+        $list = $rotationRuleWarehouse->getRuleAll($ruleType);
+        $data = [];
+        $json = [];
+        foreach ($list as $key=>$value){
+            $data['ruleWarehouseId'] = $value['id'];
+            $data['ruleTitle'] = $value['ruleTitle'];
+            $select1 = json_decode($value['select1'],true);
+            $select2 = json_decode($value['select2'],true);
+            $input1 = json_decode($value['input1'],true);
+            $input2 = json_decode($value['input2'],true);
+            //是否开启
+            if($value['status'] == 2){
+                $data['status'] = false;
+            }elseif ($value['status'] == 1){
+                $data['status'] = true;
+            }
+            //是否多条
+            if($value['isMultiple'] == 1){
+                $data['isMultiple'] = 'yes';
+                if($input1){
+                    $obj = [];
+                    $obj[] = [$select1,$input1];
+                }else{
+                    $obj = [];
+                    $obj[] = [$select1];
+                }
+                $data['formData'] = $obj;
+            }else{
+                $data['isMultiple'] = 'no';
+                $allJson = [$select1,$select2,$input1,$input2];
+                $newArray = array_filter($allJson);
+                $data['formData'] = array_values($newArray);
+            }
+
+            $json[$key] = $data;
+        }
+        $b = json_decode($a,true);
+        $this->serializer['errno'] = 0;
+        $this->serializer['status'] = true;
+        $this->serializer['message'] = "获取成功";
+        return $json;
+
+
+         /**
+         *
+         *
+         * ,取出调出 调入 规则行从rotationRuleWarehouse表
+         * select id ruleTypeName,ruleTitle,select1,select2,input1,input2 from rotationRuleWarehouse ;
+         *
+         */
+    }
+    /**
+     * @SWG\Post(path="/rotation-rule-warehouse/insert-rule",
+     *     tags={"云平台-rotationRuleWarehouse-轮转规则库"},
+     *     summary="获取规则列表数据",
+     *     description="获取规则列表数据",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "info",
+     *        description = "返回信息",
+     *        required = true,
+     *        type = "string",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "rotationId",
+     *        description = "轮转表id",
+     *        required = true,
+     *        type = "string",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "groupId",
+     *        description = "组id",
+     *        required = true,
+     *        type = "string",
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "ruleType",
+     *        description = "规则类型：空默认out调出规则in调入规则",
+     *        required = true,
+     *        type = "string",
+     *     ),
+
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "返回技能类型列表"
+     *     ),
+     * )
+     *
+     **/
+    //从规则库页面获取数据 insert 轮转规则表（rotationRule）
+    public function actionInsertRule()
+    {
+        $post = Yii::$app->request->post();
+        $array = array();
+       var_dump($post['info']);exit;
+
+        $p=(array)json_decode($post['info']);
+         // var_dump($p);exit;
+        foreach($p as $key=>$value){
+            var_dump($value);exit;
+            //判断状态是否为 true
+            if($value['status'] == 'true'){
+                $array[$key]['rotationId'] = $post['rotationId'];
+                $array[$key]['groupId'] = $post['groupId'];
+                $array[$key]['ruleType'] = $post['ruleType'];
+                $array[$key]['ruleWarehouseId'] = $value['ruleWarehouseId'];
+                //判断是否为空 为空跳出本次循环
+                if(empty($value['formData'])){
+                    continue;
+                }
+                foreach($value['formData'] as $k=>$v){
+                    //因为数组 维数不同 判断
+                    if(!empty($v[0])){
+                        $select1 = [];
+                        $input1 = [];
+                        foreach($v as $k2=>$v2){
+                            if($v2['id'] == 'select1'){
+                                $select1[] = $v2['selected'];
+                            }
+
+                            if($v2['id'] == 'input1'){
+
+                                $input1[] = $v2['value'];
+                            }
+                        }
+                        //判断如果有值就存 如果为空 就不存这个字段
+                        if(!empty($select1)){
+                            $array[$key]['select1'][] = $select1;
+                        }
+                        if(!empty($input1)){
+                            $array[$key]['input1'][] = $input1;
+                        }
+
+                    }else{
+                        //判断是否有值 如果没有值就不存这个字段
+                        if(!empty($v['selected'])){
+                            //因为$v['selected']这个值有数组和 字符串两种类型  判断
+                            if($v['id'] == 'select1'){
+                                if(is_array($v['selected'])){
+                                    $array[$key]['select1'][] = $v['selected'];
+                                }else{
+                                    $array[$key]['select1'][] = [$v['selected']];
+                                }
+                            }
+                            if($v['id'] == 'select2'){
+                                if(is_array($v['selected'])){
+                                    $array[$key]['select2'][] = $v['selected'];
+                                }else{
+                                    $array[$key]['select2'][] = [$v['selected']];
+                                }
+
+                            }
+
+                        }
+                        //判断是否有值 如果没有值就不存这个字段
+                        if(!empty($v['value'])){
+                            if($v['id'] == 'input1'){
+                                $array[$key]['input1'][] = $v['value'];
+                            }
+                            if($v['id'] == 'input2'){
+                                $array[$key]['input2'][] = $v['value'];
+                            }
+
+                        }
+                    }
+
+                }
+            }
+        }
+        $array = array_merge($array); //重新生成数组索引  0,1,2
+        $RotationRule = new RotationRule();
+        foreach ($array as $key1=>$value1){
+            $RotationRule->rotationId = $value1['rotationId'];
+            $RotationRule->groupId = $value1['groupId'];
+            $RotationRule->ruleType = $value1['ruleType'];
+            $RotationRule->rotationRuleWarehouseId = $value1['rotationRuleWarehouseId'];
+            /*$RotationRule->select1 = json_encode($value['select1']);
+            $RotationRule->select2 = json_encode($value['select2']);
+            $RotationRule->input1 = json_encode($value['input1']);
+            $RotationRule->input2 = json_encode($value['input2']);*/
+            $RotationRule->save();
+//            $RotationRule->getErrors();
+        }
+
+        $this->serializer['errno']   = 0;
+        $this->serializer['status']   = true;
+        $this->serializer['message'] = "获取成功";
+        /**
+         * 获取用户数据后存入规则库
+         * insert into rotationRule (rotationId,groupId,ruleType,select1,select2,input1,input2) value(2,2,'on',1,'[["101", "102"], ["201", "202"]]');
+         *添加规则数据时计算符合轮转条件的人员存入rotationResultTemp表格,直接用post传的值也行
+         * select rotationId,groupId,ruleType,rotationRuleWarehouseId,select1,input1 from rotationRule;
+         * 取出用户接口数据, 使用交集array_intersect查询符合条件人员, 存入rotationResultTemp表
+         *
+         *
+         * 初始值只是显示满足条件的全部的人串(A组1月份一条,A组2月份一条,B组1月一条,B组2月一条,)
+         * insert into rotationResultTemp (rotationId,rotationDate,groupId,usersRecommend) value(1,2018-02,3,'[{"userId": "1","userName": "A组满足人1"},{"userId": "2","userName": "A组满足人2"}]')
+         *
+         */
+
+    }
+}

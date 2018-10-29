@@ -1,0 +1,613 @@
+<?php
+namespace frontend\controllers\v1;
+
+use common\models\consider\Consider;
+use common\models\employee\Employee;
+use common\models\overtime\Overtime;
+use common\models\overtime\OvertimeComment;
+use common\models\teach\Teach;
+use common\models\user\User;
+use opw\react\ReactAsset;
+use yii\rest\ActiveController;
+use yii\web\Response;
+use yii;
+
+class OvertimeController extends \common\rest\Controller
+{
+
+
+    /**
+     * @var string
+     */
+    public $modelClass = 'common\models\Overtime';
+
+    /**
+     * @var array
+     */
+    public $serializer = [
+        'class' => 'common\rest\Serializer',    // 返回格式数据化字段
+        'collectionEnvelope' => 'data',       // 制定数据字段名称
+        'message' => '操作成功',                      // 文本提示
+    ];
+
+
+    /**
+     * @param  [action] yii\rest\IndexAction
+     * @return [type]
+     */
+    public function beforeAction($action)
+    {
+        $format = \Yii::$app->getRequest()->getQueryParam('format', 'json');
+
+        if ($format == 'xml') {
+            \Yii::$app->response->format = \yii\web\Response::FORMAT_XML;
+        } else {
+            \Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+        }
+
+        return $action;
+    }
+
+    /**
+     * @param  [type]
+     * @param  [type]
+     * @return [type]
+     */
+    public function afterAction($action, $result)
+    {
+        $result = parent::afterAction($action, $result);
+
+        return $result;
+    }
+
+    public function behaviors()
+    {
+        $behaviors = parent::behaviors();
+        $behaviors['contentNegotiator']['formats']['text/html'] = Response::FORMAT_HTML;
+        return $behaviors;
+    }
+
+
+    public function actions()
+    {
+        $actions = parent::actions();
+        unset($actions['index']);
+        return $actions;
+    }
+
+
+
+    /**
+     * @SWG\Post(path="/overtime/add-overtime",
+     *     tags={"云平台-overtime-加班"},
+     *     summary="指定加班",
+     *     description="指定加班",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "emp_name",
+     *        description = "员工姓名",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "current_day",
+     *        description = "加班日期",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "stat_time",
+     *        description = "开始时间",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "end_time",
+     *        description = "结束时间",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "is_holiday",
+     *        description = "是否转休假",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "content",
+     *        description = "注释说明",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "培训列表"
+     *     ),
+     *     @SWG\Response(
+     *         response = 403,
+     *         description = "操作失败",
+     *     )
+     * )
+     *
+     **/
+    public function actionAddOvertime(){
+        $work_station = $this->workStation;
+        $firstName = $this->firstName;
+        if($firstName == ''){
+            $firstName = $this->userName;
+        }
+        $userId = $this->userId;
+        $data = yii::$app->request->post();
+        $overtime = new Overtime();
+        $model = $overtime->addovertime($data,$firstName,$work_station,$userId);
+        if($model === 2){
+            $this->serializer['message'] = '请输入组内正确人员姓名';
+            $this->serializer['status'] = false;
+            return false;
+        }
+        return $model;
+    }
+
+
+
+
+    /**
+     * @SWG\Post(path="/overtime/overtime-list",
+     *     tags={"云平台-overtime-加班"},
+     *     summary="加班列表",
+     *     description="加班列表",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "stat_time",
+     *        description = "开始时间",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "end_time",
+     *        description = "结束时间",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "emp_name",
+     *        description = "员工姓名",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "status",
+     *        description = "状态",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "is_quit",
+     *        description = "包括过去员工",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "work_station",
+     *        description = "所在小组",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "请假列表"
+     *     ),
+     *     @SWG\Response(
+     *         response = 403,
+     *         description = "操作失败",
+     *     )
+     * )
+     *
+     **/
+    public function actionOvertimeList(){
+        $work_station = $this->workStation;
+        $first_name = $this->firstName;
+        $data = yii::$app->request->post();
+        $overtime = new Overtime();
+        $model = $overtime->list($data,$work_station,$first_name);
+        return $model;
+    }
+
+
+
+    /**
+     * @SWG\Post(path="/overtime/my-overtime",
+     *     tags={"云平台-overtime-加班"},
+     *     summary="我的加班",
+     *     description="我的加班",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "stat_time",
+     *        description = "开始时间",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "end_time",
+     *        description = "结束时间",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "status",
+     *        description = "状态",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "培训列表"
+     *     ),
+     *     @SWG\Response(
+     *         response = 403,
+     *         description = "操作失败",
+     *     )
+     * )
+     *
+     **/
+    public function actionMyOvertime(){
+        $data = yii::$app->request->post();
+        $emp_number = $this->empNumber;
+        $overtime = new Overtime();
+        $model = $overtime->myovertime($data,$emp_number);
+        return $model;
+    }
+
+
+
+    /**
+     * @SWG\Post(path="/overtime/add-comment",
+     *     tags={"云平台-overtime-加班"},
+     *     summary="添加评论",
+     *     description="添加评论",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "overtime_id",
+     *        description = "加班表id",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "comments",
+     *        description = "评论内容",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "emp_number",
+     *        description = "员工id",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "培训列表"
+     *     ),
+     *     @SWG\Response(
+     *         response = 403,
+     *         description = "操作失败",
+     *     )
+     * )
+     *
+     **/
+    public function actionAddComment(){
+        $data = yii::$app->request->post();
+        $user_id = $this->userId;
+        $first_name = $this->firstName;
+        $overtime = new Overtime();
+        $model = $overtime->addcomment($data,$user_id,$first_name);
+        return $model;
+    }
+
+
+
+
+    /**
+     * @SWG\Post(path="/overtime/comment-list",
+     *     tags={"云平台-overtime-加班"},
+     *     summary="评论列表",
+     *     description="评论列表",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "overtime_id",
+     *        description = "加班表id",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "培训列表"
+     *     ),
+     *     @SWG\Response(
+     *         response = 403,
+     *         description = "操作失败",
+     *     )
+     * )
+     *
+     **/
+    public function actionCommentList(){
+        $overtime_id = yii::$app->request->post('overtime_id');
+        $query = OvertimeComment::find()->asArray()->where(['overtime_id'=>$overtime_id])->all();
+        return $query;
+    }
+
+
+    /**
+     * @SWG\Post(path="/overtime/overtime-status",
+     *     tags={"云平台-overtime-加班"},
+     *     summary="状态修改",
+     *     description="状态修改",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "overtime_id",
+     *        description = "加班表id",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "status",
+     *        description = "状态",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "培训列表"
+     *     ),
+     *     @SWG\Response(
+     *         response = 403,
+     *         description = "操作失败",
+     *     )
+     * )
+     *
+     **/
+    public function actionOvertimeStatus(){
+        $data = yii::$app->request->post();
+        $overtime = Overtime::find()->where(['id'=>$data['overtime_id']])->one();
+        $overtime->status = $data['status'];
+        $query = $overtime->save();
+        return $query;
+    }
+
+
+
+
+    /**
+     * @SWG\Post(path="/overtime/mytimecard-list",
+     *     tags={"云平台-overtime-考勤"},
+     *     summary="我的考勤",
+     *     description="我的考勤",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "start_time",
+     *        description = "开始时间",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "end_time",
+     *        description = "结束时间",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "考勤列表"
+     *     ),
+     *     @SWG\Response(
+     *         response = 403,
+     *         description = "操作失败",
+     *     )
+     * )
+     *
+     **/
+    public function actionMytimecardList(){
+        $emp_number = $this->empNumber;
+        $data =yii::$app->request->post();
+        $overtime = new Overtime();
+        $model = $overtime->mytimecardlist($data,$emp_number);
+        return $model;
+    }
+
+
+
+    /**
+     * @SWG\Post(path="/overtime/employeetimecard-list",
+     *     tags={"云平台-overtime-考勤"},
+     *     summary="员工考勤",
+     *     description="员工考勤",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "emp_name",
+     *        description = "员工姓名",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "start_time",
+     *        description = "开始时间",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "end_time",
+     *        description = "结束时间",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "考勤列表"
+     *     ),
+     *     @SWG\Response(
+     *         response = 403,
+     *         description = "操作失败",
+     *     )
+     * )
+     *
+     **/
+    public function actionEmployeetimecardList(){
+        $data = yii::$app->request->post();
+        $work_station = $this->workStation;
+        $overtime = new Overtime();
+        $model = $overtime->employeetimecardlist($data,$work_station);
+        return $model;
+    }
+
+
+
+
+    /**
+     * @SWG\Post(path="/overtime/work-list",
+     *     tags={"云平台-overtime-考勤"},
+     *     summary="班次记录",
+     *     description="班次记录",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "Token",
+     *        description = "Token",
+     *        required = true,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "emp_name",
+     *        description = "员工姓名",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "shift_time",
+     *        description = "上班时间",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "work_station",
+     *        description = "所在小组",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "work_type",
+     *        description = "班次",
+     *        required = false,
+     *        type = "integer"
+     *     ),
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = "考勤列表"
+     *     ),
+     *     @SWG\Response(
+     *         response = 403,
+     *         description = "操作失败",
+     *     )
+     * )
+     *
+     **/
+    public function actionWorkList(){
+        $data = yii::$app->request->post();
+        $work_station = $this->workStation;
+        $first_name = $this->firstName;
+        $overtime = new Overtime();
+        $model = $overtime->worklist($data,$work_station,$first_name);
+        return $model;
+    }
+
+
+
+
+
+}
+

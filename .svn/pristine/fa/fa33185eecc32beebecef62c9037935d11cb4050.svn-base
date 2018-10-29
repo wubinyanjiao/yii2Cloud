@@ -1,0 +1,48 @@
+<?php
+
+namespace common\models\RotaryEmployee;
+
+use Yii;
+use \common\models\rotaryemployee\base\RotaryEmployee as BaseAttendanceRecord;
+use yii\helpers\ArrayHelper;
+
+use common\models\shift\ShiftResult;
+use common\models\shift\Schedule;
+use common\models\shift\ShiftType;
+use common\models\shift\ShiftTypeDetail;
+
+//ohrm_work_rotary_employee
+/**
+ * This is the model class for table "ohrm_attendance_record".
+ */
+class RotaryEmployee extends BaseAttendanceRecord
+{
+    public function behaviors()
+    {
+        return ArrayHelper::merge(
+            parent::behaviors(),
+            [
+                # custom behaviors
+            ]
+        );
+    }
+
+    public function rules()
+    {
+        return ArrayHelper::merge(
+            parent::rules(),
+            [
+                # custom validation rules
+            ]
+        );
+    }
+
+
+    /*
+     * 获取所有的轮转列表
+     */
+    public function getWorkEmployee(){
+        $query = self::find()->all();
+        return $query;
+    }
+}

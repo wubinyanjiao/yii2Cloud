@@ -1,0 +1,843 @@
+<?php
+
+namespace frontend\controllers\v1;
+
+/**
+* 用户管理 用户列表
+*/
+use yii;
+use yii\web\Response;
+
+use yii\captcha\CaptchaAction;
+use yii\filters\AccessControl;
+use yii\helpers\ArrayHelper;
+use yii\rest\OptionsAction;
+
+//use frontend\models\gedu\resources\LoginForm;
+//use frontend\models\gedu\resources\UserForm;
+// use frontend\models\gedu\resources\User;
+// use frontend\models\gedu\resources\UsersToUsers;
+// use frontend\modules\user\models\SignupSmsForm;
+use common\models\employee\Employee;
+use common\models\system\SystemUsers;
+use common\models\subunit\Subunit;
+use common\models\user\User;
+use common\models\attendance\AttendanceRecord;
+use common\models\attendance\AttendanceRemindLog;
+use common\models\leave\LeaveEntitlement;
+use common\models\system\UniqueId;
+
+//use common\components\Qiniu\Auth;
+//use common\components\Qiniu\Storage\BucketManager;
+
+use cheatsheet\Time;
+
+class TimedTaskController extends \common\rest\SysController
+{
+    //public $modelClass = 'common\models\SystemUsers';
+
+    /**
+     * @var array
+     */
+    public $serializer = [
+        'class'              => 'common\rest\Serializer',
+        'collectionEnvelope' => 'result',
+        // 'errno'              => 0,
+        'message'            => 'OK',
+    ];
+
+    /**
+     * @param  [action] yii\rest\IndexAction
+     * @return [type] 
+     */
+    public function beforeAction($action)
+    {
+        $format = \Yii::$app->getRequest()->getQueryParam('format', 'json');
+
+        if($format == 'xml'){
+            \Yii::$app->response->format = \yii\web\Response::FORMAT_XML;
+        }else{
+            \Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+        }
+
+        // 移除access行为，参数为空全部移除
+        // Yii::$app->controller->detachBehavior('access');
+        return $action;
+    }
+    /**
+    * @inheritdoc
+    */
+    public function behaviors()
+    {
+        return ArrayHelper::merge(
+            parent::behaviors(),
+            [
+                'access' => [
+                    'class' => AccessControl::className(),
+                    'rules' => [[
+                        'allow' => true,
+                        'matchCallback' => function ($rule, $action) {
+                            // return true;
+                            // var_dump($this->module->id . '_' . $this->id . '_' . $action->id); exit();
+                            return \Yii::$app->user->can(
+                                $this->module->id . '_' . $this->id . '_' . $action->id, 
+                                ['route' => true]
+                            );
+                        },
+                    ]]
+                ]
+            ]
+        );
+    }
+
+
+    /**
+     * @SWG\Get(path="/timed-task/second-daywork",
+     *     tags={"云平台-TimedTask-定时任务"},
+     *     summary="第二天班次",
+     *     description="第二天班次",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "query",
+     *        name = "customer_id",
+     *        description = "用户标识",
+     *        required = false,
+     *        type = "string"
+     *     ),
+     *     
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = ""
+     *     ),
+     *     @SWG\Response(
+     *         response = 403,
+     *         description = "",
+     *     )
+     * )
+     *
+     */
+    public function actionSecondDaywork()
+    {
+
+        $params = Yii::$app->params;
+        
+        //测试
+        $customer_id=Yii::$app->request->get('customer_id'); 
+        $templateId = @$params['templateId'][$customer_id];
+
+        if(empty($templateId)){
+            return false;
+        }
+        $templateId = $templateId['default'];
+        $week = array(0,6);
+        $date = date('Y-m-d',strtotime('+1 days'));
+        $w = date('w',strtotime($date));
+
+        if(in_array($w, $week)){
+            $notSubunit = array(18);   
+        }else{
+            $notSubunit = array(14,18);
+        }
+        $Employee =  new Employee(); 
+        $Subunit = new Subunit();
+        $AttendanceRecord = new AttendanceRecord();
+        $search['customer_id'] = $customer_id;
+        $search['notSubunit'] = $notSubunit;
+        $empList  = $Employee->getSubunitBySearch($search);
+        $empArr = array();
+        $emp =array();
+        if($empList){
+            foreach ($empList as $key => $value) {
+                array_push($empArr, $value['emp_number']);
+                $emp[$value['emp_number']] = $value['emp_firstname'];
+            }
+        }
+
+        if(empty($emp)){
+            return false;
+        }
+
+        $isopenId = true;
+        $list = $Employee->getEmployeeWorkShift($empArr,$date,$isopenId);
+        $backArr = array();
+        $s = array();
+
+        if($list){
+            /*
+            您好，您有一条班次提醒
+            姓名：张三
+            时间：2017-8-20 18:55:21
+            状态：明日班次
+            白班(08:00-12:00 14:30-17:30)，祝您好心情！
+             */
+            $firsteHead = '您好，您有一条班次提醒';
+            $explain = '明日班次';
+            $footer = '';
+
+
+            foreach ($list as $key => $value) {
+               $footer = '';
+               $backArr['customer_id'] = null;
+               $backArr['openid'] = null;
+               $backArr['templateid'] = $templateId;
+               $date = $value['shift_date'];
+
+               $wname = '';
+               $shiftTypeId = 0;
+
+               $isWork = 0 ;
+               $fooder = '';
+               if($value['frist_type_id']){
+                    $isWork = 1 ;
+                    $shiftTypeId = $value['frist_type_id'];
+                    $shiftType = $AttendanceRecord->getShiftTypeById($value['frist_type_id']);
+
+
+                    $work_start_time =$shiftType->start_time;
+                    $work_middend_time =$shiftType->end_time_afternoon;
+                    $wname = $shiftType->name;
+
+                        
+                    $work_start_time = date('H:i',strtotime($value['shift_date'].' '.$shiftType->start_time));
+                    $work_middend_time = date('H:i',strtotime($value['shift_date'].' '.$shiftType->end_time_afternoon));
+
+                    $fooder =  $work_start_time.'-'.$work_middend_time;
+                }
+
+                if($value['second_type_id']){
+                    $isWork = 1 ;
+                    $shiftType = $AttendanceRecord->getShiftTypeById($value['second_type_id']);
+
+
+                        $work_middstart_time =$shiftType->start_time_afternoon;
+                        $work_end_time =$shiftType->end_time;
+
+                        if($shiftTypeId!=$value['second_type_id']){
+                            $wname .= '/'.$shiftType->name;
+                        }                       
+                        $shiftTypeId = $value['second_type_id'];
+
+                        $work_middstart_time = date('H:i',strtotime($value['shift_date'].' '.$shiftType->start_time_afternoon));
+                        $work_end_time = date('H:i',strtotime($value['shift_date'].' '.$shiftType->end_time));
+                        $fooder .=  ' '.$work_middstart_time.'-'.$work_end_time;
+                    
+                }
+
+                if($value['third_type_id']){
+                    $isWork = 1 ;
+                    $shiftType = $AttendanceRecord->getShiftTypeById($value['third_type_id']);
+      
+
+                        $work_thirdstart_time =$shiftType->time_start_third;
+                        $work_thirdend_time =$shiftType->time_end_third;
+                        if($shiftTypeId!=$value['third_type_id']){
+                            $wname .= '/'.$shiftType->name;
+                        }
+                        
+                        $shiftTypeId = $value['third_type_id'];
+                        
+         
+                        $work_thirdstart_time = date('H:i',strtotime($value['shift_date'].' '.$shiftType->time_start_third));
+                        $work_thirdend_time = date('H:i',strtotime($value['shift_date'].' '.$shiftType->time_end_third));
+                        $fooder .=  ' '.$work_thirdstart_time.'-'.$work_thirdend_time;
+                    
+                }
+
+
+                $footer = trim($wname,'/').'('.trim($fooder).')';
+
+
+               // $stat = date('H:i',strtotime($date.' '.$value['shiftType']['start_time']));
+               // $end_afternoon = date('H:i',strtotime($date.' '.$value['shiftType']['end_time_afternoon']));
+               // $start_afternoon = date('H:i',strtotime($date.' '.$value['shiftType']['start_time_afternoon']));
+   
+               // $end = date('H:i',strtotime($date.' '.$value['shiftType']['end_time']));
+               // $name = $value['shiftType']['name'];
+
+               // $footer .= $name;
+
+               //  if($end_afternoon&&$end_afternoon!='00:00'){
+               //      if($start_afternoon&&$start_afternoon!='00:00'){
+               //          $footer .= '('.$stat.'-'.$end_afternoon.' '.$start_afternoon.'-'.$end.')';
+               //      }else{
+               //          $footer .= '('.$stat.'-'.$end_afternoon.')';
+               //      }
+                    
+               //  }else{
+               //      $footer .= '('.$stat.'-'.$end.')';
+               //  }
+
+
+                $footer .= "\n".'祝您好心情!' ;
+                $openid = $value['user']['open_id'];
+                $customer_id = $customer_id;
+               
+                $keyword1 = $emp[$value['emp_number']];
+                $keyword2 = $value['shift_date'];
+                $keyword2 = date('Y-m-d H:i:s');
+                $keyword3 = $explain;
+                
+                if($isWork){
+                    $res = weiXinNotice($customer_id,$openid,$templateId,$firsteHead,$keyword1,$keyword2,$keyword3,$footer);
+                    $s[] = array('status'=>$res,'emp'=>$value['emp_number']);
+                }
+                
+
+            }
+        }
+       
+         return $s;         
+
+    }
+     /**
+     * @SWG\Get(path="/timed-task/punch-remind",
+     *     tags={"云平台-TimedTask-定时任务"},
+     *     summary="上班提醒",
+     *     description="上班提醒",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "query",
+     *        name = "customer_id",
+     *        description = "用户标识",
+     *        required = false,
+     *        type = "string"
+     *     ),
+     *     
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = ""
+     *     ),
+     *     @SWG\Response(
+     *         response = 403,
+     *         description = "",
+     *     )
+     * )
+     *
+     */
+    public function actionPunchRemind(){
+
+        $params = Yii::$app->params;
+        
+        //测试
+        $customer_id=Yii::$app->request->get('customer_id');    
+
+        $templateId = @$params['templateId'][$customer_id];
+
+        $backurl = $params['WEIXINBACKURL'].'check-in';
+
+        if(empty($templateId)){
+            return false;
+        }
+        $templateId = $templateId['default'];
+        $chaTime = 60*11;    //提前11分小时
+        $date = date('Y-m-d');
+        
+        $week = array(0,6);  //有的组周末上班
+
+        $w = date('w',strtotime($date));
+
+        if(in_array($w, $week)){
+            $notSubunit = array(18);    
+        }else{
+            $notSubunit = array(14,18);
+        }
+        
+        $Employee =  new Employee(); 
+        $Subunit = new Subunit();
+        $AttendanceRecord = new AttendanceRecord();
+        $search['customer_id'] = $customer_id;
+        $search['notSubunit'] = $notSubunit;
+        $empList  = $Employee->getSubunitBySearch($search);
+
+        $empArr = array();
+        $emp =array();
+        if($empList){
+            foreach ($empList as $key => $value) {
+                array_push($empArr, $value['emp_number']);
+                $emp[$value['emp_number']] = $value['emp_firstname'];
+            }
+        }
+
+        if(empty($emp)){
+            return false;
+        }
+        
+        //$empArr = array(802);
+        $isopenId = true;
+        $list = $Employee->getEmployeeWorkShift($empArr,$date,$isopenId);
+        $backArr = array();
+        $nowtime = time();
+        $s = array();
+        if($list){
+            /*
+            您好，您有一条考勤打卡提醒
+            姓名：张三
+            时间：2017-8-20 18:55:21
+            状态：下班打卡
+            下班时间为08:00，请别忘记打卡！
+             */
+            $firsteHead = '您好，您有一条考勤打卡提醒';
+            $explain = '';
+            $footer = '';
+
+            foreach ($list as $key => $value) {
+                $is_true = false;
+                //$isnight = $value['shiftType']['is_night_shift'];
+                $date = $value['shift_date'];
+
+                $work_start_time = '';
+                $work_middend_time = '';
+
+                $work_middstart_time ='';
+                $work_end_time ='';
+
+                $work_thirdstart_time = '';
+                $work_thirdend_time = '';
+
+                $isnight = 0 ;
+                $is_daka_half = 0;
+
+                if($value['frist_type_id']){
+                    $shiftTypeId = $value['frist_type_id'];
+                    $shiftType = $AttendanceRecord->getShiftTypeById($value['frist_type_id']);
+
+
+                    $work_start_time =$shiftType->start_time;
+                    $work_middend_time =$shiftType->end_time_afternoon;
+                    
+                    $isnight = $shiftType->is_night_shift ;
+                    $is_daka_half = $shiftType->is_daka_half ;
+                    
+
+
+                        
+                    // $work_start_time = date('H:i',strtotime($value['shift_date'].' '.$shiftType->start_time));
+                    // $work_middend_time = date('H:i',strtotime($value['shift_date'].' '.$shiftType->end_time_afternoon));
+
+                    
+                }
+
+                if($value['second_type_id']){
+                    $shiftType = $AttendanceRecord->getShiftTypeById($value['second_type_id']);
+
+
+                        $work_middstart_time =$shiftType->start_time_afternoon;
+                        $work_end_time =$shiftType->end_time;
+    
+                        if(empty($isnight)){
+                            $isnight = $shiftType->is_night_shift ;
+                        }
+                        if(empty($is_daka_half)){
+                            $is_daka_half = $shiftType->is_daka_half ;
+                        }
+
+
+                        // $work_middstart_time = date('H:i',strtotime($value['shift_date'].' '.$shiftType->start_time_afternoon));
+                        // $work_end_time = date('H:i',strtotime($value['shift_date'].' '.$shiftType->end_time));
+                        
+                    
+                }
+
+                if($value['third_type_id']){
+                    $shiftType = $AttendanceRecord->getShiftTypeById($value['third_type_id']);
+      
+
+                        $work_thirdstart_time =$shiftType->time_start_third;
+                        $work_thirdend_time =$shiftType->time_end_third;
+                        if(empty($isnight)){
+                            $isnight = $shiftType->is_night_shift ;
+                        }
+                        if(empty($is_daka_half)){
+                            $is_daka_half = $shiftType->is_daka_half ;
+                        }
+                        
+         
+                        // $work_thirdstart_time = date('H:i',strtotime($value['shift_date'].' '.$shiftType->time_start_third));
+                        // $work_thirdend_time = date('H:i',strtotime($value['shift_date'].' '.$shiftType->time_end_third));
+                        
+                    
+                }
+
+
+
+
+
+
+               $stat = strtotime($date.' '.$work_start_time);
+               $end_afternoon = strtotime($date.' '.$work_middend_time);
+
+               $start_afternoon = strtotime($date.' '.$work_middstart_time);
+               $end = strtotime($date.' '.$work_end_time);
+
+               $start_third = strtotime($date.' '.$work_thirdstart_time);
+               $end_third = strtotime($date.' '.$work_thirdend_time);
+             
+               //$is_daka_half = $value['shiftType']['is_daka_half'];
+               //判断是否是夜班 
+               if($isnight){
+                    if($stat>$end_afternoon){
+                        $end_afternoon = strtotime('+1 days',$end_afternoon);
+                    }
+
+                    if($stat>$start_afternoon){
+                        $start_afternoon = strtotime('+1 days',$start_afternoon);
+                    }
+
+                    if($stat>$end){
+                        $end = strtotime('+1 days',$end);
+                    }
+               }
+
+                
+                $recod= $AttendanceRecord->getAttendanceRecord($value['emp_number'],$date);
+
+                $chaStat = $stat-$nowtime;
+                if($chaStat>0&&$chaStat<$chaTime){
+                    if($recod&&!empty($recod['punch_in_user_time'])){
+                        continue;
+                    }
+
+
+                    $is_true = true;
+                    $explain = '上班打卡';
+                    $footer = '上班时间为'.$work_start_time.'请别忘记打卡!';
+               } 
+               $chaEndAfternoon = $end_afternoon-$nowtime;
+               if($chaEndAfternoon>0&&$chaEndAfternoon<$chaTime){
+                    $is_true = true;
+
+                    if($work_end_time=='00:00'||$work_end_time=='00:00:00'){
+
+                        if($recod&&!empty($recod['punch_out_user_time'])){
+                            continue;
+                        }
+                        $explain = '下班打卡';
+                        $footer = '下班时间为'.$work_middend_time.'请别忘记打卡!';
+                    }else{
+                        if(!$is_daka_half){
+                            continue;
+                        }
+                        if($recod&&!empty($recod['end_time_afternoon'])){
+                            continue;
+                        }
+                        $explain = '中途下班打卡';
+                        $footer = '中途下班时间为'.$work_middend_time.'请别忘记打卡!';
+                    }
+
+                    
+               }
+               $chaStartAfternoon = $start_afternoon-$nowtime;
+               if($chaStartAfternoon>0&&$chaStartAfternoon<$chaTime){
+                    if($work_start_time=='00:00'||$work_start_time=='00:00:00'){
+                        if($recod&&!empty($recod['punch_in_user_time'])){
+                            continue;
+                        }
+                        $explain = '上班打卡';
+                        $footer = '上班时间为'.$work_middstart_time.'请别忘记打卡!';
+                    }else{
+                        if(!$is_daka_half){
+                            continue;
+                        }
+                        if($recod&&!empty($recod['start_time_afternoon'])){
+                            continue;
+                        }
+                        $explain = '中途上班打卡';
+                        $footer = '中途上班时间为'.$work_middstart_time.'请别忘记打卡!';
+                    }
+
+                    $is_true = true;
+                    
+               }
+               $chaEnd = $end-$nowtime;
+               if($chaEnd>0&&$chaEnd<$chaTime){
+                    if($recod&&!empty($recod['punch_out_user_time'])){
+                        continue;
+                    }
+                    $is_true = true;
+                    $explain = '下班打卡';
+                    $footer = '下班时间为'.$work_end_time.'请别忘记打卡!';
+               }
+
+
+               $chaStartThird = $start_third-$nowtime;
+               if($chaStartThird>0&&$chaStartThird<$chaTime){
+                    if(($stat=='00:00'||$stat=='00:00:00')&&($start_afternoon=='00:00'||$start_afternoon=='00:00:00')){
+                        if($recod&&!empty($recod['start_time_third'])){
+                            continue;
+                        }
+                        $explain = '上班打卡';
+                        $footer = '上班时间为'.$work_thirdstart_time.'请别忘记打卡!';
+                    }else{
+                        if(!$is_daka_half){
+                            continue;
+                        }
+                        if($recod&&!empty($recod['start_time_third'])){
+                            continue;
+                        }
+                        $explain = '中途上班打卡';
+                        $footer = '中途上班时间为'.$work_thirdstart_time.'请别忘记打卡!';
+                    }
+
+                    $is_true = true;
+                    
+               }
+
+               $chaEndThird = $end_third-$nowtime;
+               if($chaEndThird>0&&$chaEndThird<$chaTime){
+                    if($recod&&!empty($recod['end_time_third'])){
+                        continue;
+                    }
+                    $is_true = true;
+                    $explain = '下班打卡';
+                    $footer = '下班时间为'.$work_thirdend_time.'请别忘记打卡!';
+               }
+
+                $openid = $value['user']['open_id'];
+                $customer_id = $customer_id;
+                $keyword1 = $emp[$value['emp_number']];
+                $keyword2 = $value['shift_date'];
+                $keyword2 = date('Y-m-d H:i:s');
+                $keyword3 = $explain;
+                if($is_true){
+                    //测试时间段 发送班次提醒次数
+                    $AttendanceRemindLog = new AttendanceRemindLog();
+                    $AttendanceRemindLog->emp_number = $value['emp_number'];
+                    $AttendanceRemindLog->create_time = date('Y-m-d H:i:s');
+                    $AttendanceRemindLog->content = $keyword1.':'.$explain.'-'.$footer;
+                    $AttendanceRemindLog->save();
+                    //var_dump($customer_id,$openid,$templateId,$firsteHead,$keyword1,$keyword2,$keyword3,$footer,$backurl);die;
+                    
+                    // $res = weiXinNotice($customer_id,$openid,$templateId,$firsteHead,$keyword1,$keyword2,$keyword3,$footer,$backurl);
+                    // $s[]=$res;
+                }
+                
+                
+
+            }
+        }
+       
+        return $s;         
+
+    }
+
+    /**
+     * @SWG\Post(path="/timed-task/approval",
+     *     tags={"云平台-TimedTask-定时任务"},
+     *     summary="审核提醒",
+     *     description="审核提醒",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "formData",
+     *        name = "customer_id",
+     *        description = "用户标识",
+     *        required = false,
+     *        type = "string"
+     *     ),
+     *     
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = ""
+     *     ),
+     *     @SWG\Response(
+     *         response = 403,
+     *         description = "",
+     *     )
+     * )
+     *
+     */
+    public function actionApproval(){
+
+        $params = Yii::$app->params;
+        
+        //测试
+        $post=Yii::$app->request->post(); 
+
+                // $param['type'] = 1;
+                // $param['approver'] = $v['supId'];
+                // $param['sendId'] = $this->empNumber;
+                // $param['firsteHead'] = '您好，您有一条新审核提醒';
+                // $param['keyword2'] = date('Y-m-d H:i:s');
+                // $param['keyword3'] = '点击查看';
+        $type = !empty($post['type'])?$post['type']:false;
+        $approver = !empty($post['approver'])?$post['approver']:false;  //审批人
+        $sendId = !empty($post['sendId'])?$post['sendId']:false;        //申请人
+        // $approver = 802;
+        //$sendId = 803;
+        $firsteHead = !empty($post['firsteHead'])?$post['firsteHead']:false;
+
+        $keyword2 = !empty($post['keyword2'])?$post['keyword2']:false;
+        $keyword3 = !empty($post['keyword3'])?$post['keyword3']:false;
+        $footer = !empty($post['footer'])?$post['footer']:false;
+        $url = !empty($post['url'])?$post['url']:null;
+
+        if($url){
+            $backurl = $params['WEIXINBACKURL'].$url;
+        }else{
+            $backurl = null;
+        }
+
+        $firsteName = '';
+
+        $SystemUsers = new SystemUsers();
+        if($approver){
+            $user=$SystemUsers->searchSystemUsersById($approver,true);
+            if(!empty($user)&&!empty($user['open_id'])){
+                $openid = $user['open_id'];
+                $customer_id = $user['customer_id'];
+
+                $templateId = @$params['templateId'][$customer_id];
+                
+                if(empty($templateId)){
+                    return false;
+                }
+                $templateId = $templateId['default'];
+            }else{
+                return false;
+            }
+        }else{
+            return  false;
+        }
+
+        if(empty($sendId)){
+            return false;
+        }else{
+            $emp = $SystemUsers->searchSystemUsersById($sendId,true);
+
+            $firsteName = $emp['employee']['emp_firstname'];
+        }
+
+        if(empty($firsteName)){
+            return false;
+        }
+        if(empty($openid)){
+            return false;
+        }
+
+        $openid = $openid;
+        $customer_id = $customer_id;
+        $keyword1 = $firsteName;
+        $keyword2 = $keyword2;
+        $keyword3 = $keyword3;
+        
+        $res = weiXinNotice($customer_id,$openid,$templateId,$firsteHead,$keyword1,$keyword2,$keyword3,$footer,$backurl);
+        return $res;         
+
+    }
+
+    /**
+     * @SWG\Get(path="/timed-task/release-shift",
+     *     tags={"云平台-TimedTask-定时任务"},
+     *     summary="发布排班提醒",
+     *     description="发布排班提醒",
+     *     produces={"application/json"},
+     *     @SWG\Parameter(
+     *        in = "query",
+     *        name = "customer_id",
+     *        description = "用户标识",
+     *        required = false,
+     *        type = "string"
+     *     ),
+     *     
+     *     @SWG\Response(
+     *         response = 200,
+     *         description = ""
+     *     ),
+     *     @SWG\Response(
+     *         response = 403,
+     *         description = "",
+     *     )
+     * )
+     *
+     */
+    public function actionReleaseShift(){
+
+        $params = Yii::$app->params;
+        
+        //测试
+        $post=Yii::$app->request->post(); 
+        $customer_id=Yii::$app->request->get('customer_id'); 
+        $templateId = @$params['templateId'][$customer_id];
+
+       
+        if(empty($templateId)){
+            return false;
+        }
+        $templateId = $templateId['default'];
+        if(empty($customer_id)){
+            //$customer_id = $params['XAJDYFYYXB'];
+        }
+
+        $benweek = date('Y-m-d', (time() + (7 - (date('w') == 0 ? 7 : date('w'))) * 24 * 3600));
+
+        $lastweek = date('Y-m-d', strtotime('+1 monday', strtotime($benweek)));  //下周一
+
+        $lasrSunWeek = date('Y-m-d', strtotime('+1 sunday', strtotime($benweek)));  //下周日
+
+        $notSubunit = array(1,18); 
+
+        $Subunit = new Subunit();
+        $Employee = new Employee();
+        $res = array();
+        $workStation =$Subunit->getAllWorkStation($customer_id);
+
+        foreach ($workStation as $key => $value) {
+            if(in_array($value->id,$notSubunit)){
+                continue;
+            }
+
+            //$empList = $Employee->getEmpByWorkStation($value->id);
+            $empList = $Employee->getEmpBySubunit($value->id,$customer_id);
+
+
+            $empArr = array();
+            $leaderArr = array();
+            foreach($empList as $k=>$v){
+                if($v['is_leader']){
+                    $arr = array('emp_number'=>$v['emp_number'],'open_id'=>$v['open_id'],'customer_id'=>$v['customer_id'],'firsteName'=>$v['emp_firstname']);
+                    array_push($leaderArr, $arr);
+                }
+                array_push($empArr, $v['emp_number']);
+            }
+
+
+            $isopenId = true;
+            $list = $Employee->getEmployeeWorkShiftByDate($empArr,$lastweek,null);
+            /*
+            您好，您有一条工作提醒
+            姓名：张三
+            时间：2017-8-20 18:55:21
+            状态：下周排班表未发布
+            请您及时发布！
+             */
+
+            if(empty($list)){
+                foreach ($leaderArr as $ks => $vs) {
+                    if($vs['open_id']){
+                        $firsteHead = '您好，您有一条工作提醒';
+                        $keyword1 = $vs['firsteName'];
+                        $keyword2 = date('Y-m-d H:i:s');
+                        $keyword3 = '下周排班表未发布';
+                        $footer = '请您及时发布';
+                        $customer_id = $vs['customer_id'];
+                        $openid = $vs['open_id'];
+                        $res[] = weiXinNotice($customer_id,$openid,$templateId,$firsteHead,$keyword1,$keyword2,$keyword3,$footer);
+
+                   
+                    }
+                }
+
+            }
+
+
+        }
+
+        return $res;         
+
+    }
+
+    
+
+
+
+    
+}
